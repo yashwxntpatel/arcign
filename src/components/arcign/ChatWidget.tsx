@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Send, X, Sparkles } from "lucide-react";
+import { Send, X } from "lucide-react";
 import suyashPhoto from "@/assets/suyash-agent.jpg";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type Message = {
   id: string;
@@ -25,815 +27,738 @@ type VisitorMemory = {
 
 type ConsultationStage = "idle" | "ask_name" | "ask_phone" | "done";
 
-const CHAT_STORAGE_KEY = "arcign_suyash_chat_history_v4";
-const MEMORY_STORAGE_KEY = "arcign_suyash_memory_v4";
-const CONSULTATION_STAGE_KEY = "arcign_suyash_consult_stage_v4";
+// ─── Storage Keys ─────────────────────────────────────────────────────────────
 
-const getTimeMeta = () => {
-  const hour = new Date().getHours();
-  if (hour < 12) {
-    return {
-      greeting: "Good morning",
-      mood: "a fresh start to your day",
-    };
-  }
-  if (hour < 17) {
-    return {
-      greeting: "Good afternoon",
-      mood: "a great time to plan your space clearly",
-    };
-  }
-  return {
-    greeting: "Good evening",
-    mood: "a calm time to think about your project direction",
-  };
-};
+const CHAT_KEY = "arcign_chat_v5";
+const MEMORY_KEY = "arcign_memory_v5";
+const CONSULT_KEY = "arcign_consult_v5";
 
-const randomPick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
+// ─── Utilities ────────────────────────────────────────────────────────────────
 
 const normalize = (text: string) => text.toLowerCase().trim();
+const pick = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+const has = (text: string, words: string[]) => words.some((w) => text.includes(w));
+const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 
-const containsAny = (text: string, words: string[]) => {
-  return words.some((word) => text.includes(word));
+const isValidPhone = (text: string) => {
+  const digits = text.replace(/\D/g, "");
+  return digits.length >= 10 && digits.length <= 15;
 };
 
-const looksLikePhoneNumber = (text: string) => {
-  const cleaned = text.replace(/[^\d+]/g, "");
-  return cleaned.length >= 10;
-};
+const cleanPhone = (text: string) => text.replace(/[^\d+\-\s()]/g, "").trim();
 
-const cleanPhone = (text: string) => {
-  return text.replace(/[^\d+\-\s]/g, "").trim();
-};
-
-const extractLikelyName = (text: string) => {
-  const direct = text.match(/my name is\s+([a-zA-Z\s]{2,40})/i);
-  if (direct?.[1]) return direct[1].trim();
-
-  const simple = text.match(/^[a-zA-Z][a-zA-Z\s]{1,40}$/);
-  if (simple?.[0]) return simple[0].trim();
-
+const extractName = (text: string): string | undefined => {
+  const m = text.match(/(?:my name is|i(?:'|'|`)m|call me)\s+([a-zA-Z][a-zA-Z\s]{1,30})/i);
+  if (m?.[1]) return m[1].trim();
+  if (/^[a-zA-Z][a-zA-Z\s]{1,35}$/.test(text.trim())) return text.trim();
   return undefined;
 };
 
-const extractMemoryFromText = (input: string, current: VisitorMemory): VisitorMemory => {
-  const text = normalize(input);
+const getTimeMeta = () => {
+  const h = new Date().getHours();
+  if (h < 12) return { greeting: "Good morning", period: "morning" };
+  if (h < 17) return { greeting: "Good afternoon", period: "afternoon" };
+  return { greeting: "Good evening", period: "evening" };
+};
+
+// ─── Memory Extraction ────────────────────────────────────────────────────────
+
+const extractMemory = (input: string, current: VisitorMemory): VisitorMemory => {
+  const t = normalize(input);
   const next = { ...current };
 
-  if (containsAny(text, ["architecture", "architect"])) next.projectType = "Architecture";
-  if (containsAny(text, ["interior", "interiors"])) next.projectType = "Interiors";
-  if (containsAny(text, ["renovation", "remodel", "redo"])) next.projectType = "Renovation";
+  if (has(t, ["architecture", "architect", "new build", "construction"])) next.projectType = "Architecture";
+  else if (has(t, ["interior", "interiors", "decor", "furnish"])) next.projectType = "Interiors";
+  else if (has(t, ["renovation", "remodel", "redo", "refurbish", "upgrade"])) next.projectType = "Renovation";
 
-  if (containsAny(text, ["villa"])) next.propertyType = "Villa";
-  if (containsAny(text, ["apartment", "flat"])) next.propertyType = "Apartment";
-  if (containsAny(text, ["residence", "home", "house"])) next.propertyType = "Residence";
-  if (containsAny(text, ["office", "workspace", "commercial"])) next.propertyType = "Commercial";
+  if (has(t, ["villa"])) next.propertyType = "Villa";
+  else if (has(t, ["apartment", "flat", "condo"])) next.propertyType = "Apartment";
+  else if (has(t, ["bungalow"])) next.propertyType = "Bungalow";
+  else if (has(t, ["penthouse"])) next.propertyType = "Penthouse";
+  else if (has(t, ["residence", "home", "house"])) next.propertyType = "Residence";
+  else if (has(t, ["office", "workspace", "studio", "commercial", "retail", "hospitality"])) next.propertyType = "Commercial";
 
-  if (containsAny(text, ["living room"])) next.roomType = "Living room";
-  if (containsAny(text, ["bedroom"])) next.roomType = "Bedroom";
-  if (containsAny(text, ["kitchen"])) next.roomType = "Kitchen";
-  if (containsAny(text, ["dining"])) next.roomType = "Dining";
-  if (containsAny(text, ["bathroom"])) next.roomType = "Bathroom";
+  if (has(t, ["living room", "living area", "lounge"])) next.roomType = "Living room";
+  else if (has(t, ["master bedroom", "bedroom"])) next.roomType = "Bedroom";
+  else if (has(t, ["kitchen"])) next.roomType = "Kitchen";
+  else if (has(t, ["dining"])) next.roomType = "Dining";
+  else if (has(t, ["bathroom", "toilet", "washroom"])) next.roomType = "Bathroom";
+  else if (has(t, ["study", "home office", "library"])) next.roomType = "Study";
 
-  if (containsAny(text, ["modern"])) next.style = "Modern";
-  if (containsAny(text, ["minimal", "minimalist"])) next.style = "Minimal";
-  if (containsAny(text, ["luxury", "premium"])) next.style = "Luxury";
-  if (containsAny(text, ["warm", "warm minimal"])) next.style = "Warm minimal";
-  if (containsAny(text, ["contemporary"])) next.style = "Contemporary";
+  if (has(t, ["modern"])) next.style = "Modern";
+  else if (has(t, ["minimal", "minimalist", "clean"])) next.style = "Minimal";
+  else if (has(t, ["luxury", "premium", "opulent"])) next.style = "Luxury";
+  else if (has(t, ["warm", "cozy", "earthy"])) next.style = "Warm minimal";
+  else if (has(t, ["contemporary"])) next.style = "Contemporary";
+  else if (has(t, ["classic", "traditional", "heritage"])) next.style = "Classic";
+  else if (has(t, ["japandi", "wabi"])) next.style = "Japandi";
+  else if (has(t, ["industrial"])) next.style = "Industrial";
 
-  if (containsAny(text, ["planning stage", "early stage", "starting", "just starting"])) {
-    next.stage = "Early stage";
-  }
-  if (containsAny(text, ["under construction", "construction started", "site started"])) {
-    next.stage = "Under construction";
-  }
-  if (containsAny(text, ["design stage", "concept stage"])) {
-    next.stage = "Design stage";
-  }
+  if (has(t, ["planning", "early stage", "just starting", "idea stage"])) next.stage = "Early planning";
+  else if (has(t, ["under construction", "site started", "construction started"])) next.stage = "Under construction";
+  else if (has(t, ["design stage", "concept stage", "drawings"])) next.stage = "Design stage";
+  else if (has(t, ["execution", "implementation", "site work"])) next.stage = "Execution";
 
   const budgetMatch = input.match(
-    /\b(\d+\s?(lakh|lakhs|cr|crore|crores|k|m)|₹\s?\d[\d,\.]*)\b/i
+    /\b(\d[\d,\.]*\s*(?:lakh|lakhs|lac|cr|crore|crores|k|m)|₹\s*\d[\d,\.]*(?:\s*(?:lakh|cr|k|m))?)\b/i
   );
   if (budgetMatch) next.budget = budgetMatch[0];
 
   const cityMatch = input.match(
-    /\b(bangalore|bengaluru|mumbai|delhi|gurgaon|gurugram|noida|pune|hyderabad|ahmedabad|chennai|kolkata|surat|jaipur|lucknow|goa|kochi|coimbatore)\b/i
+    /\b(bangalore|bengaluru|mumbai|delhi|new delhi|gurgaon|gurugram|noida|pune|hyderabad|ahmedabad|chennai|kolkata|surat|jaipur|lucknow|goa|kochi|coimbatore|mysore|chandigarh|indore|bhopal|nagpur|vizag|visakhapatnam)\b/i
   );
   if (cityMatch) next.city = cityMatch[0];
 
-  if (
-    containsAny(text, [
-      "3 month",
-      "three month",
-      "4 month",
-      "6 month",
-      "8 month",
-      "1 year",
-      "12 month",
-    ])
-  ) {
-    next.timeline = input;
+  if (has(t, ["month", "year", "week", "quarter"])) next.timeline = input;
+
+  if (!next.name) {
+    const n = extractName(input);
+    if (n) next.name = n;
   }
 
-  const name = extractLikelyName(input);
-  if (name && !next.name) next.name = name;
-
-  if (looksLikePhoneNumber(input)) {
-    next.phone = cleanPhone(input);
-  }
+  if (isValidPhone(input)) next.phone = cleanPhone(input);
 
   return next;
 };
 
-const buildHelpfulPromptChips = (memory: VisitorMemory) => {
-  if (memory.projectType === "Architecture") {
-    return ["Site requirements", "Timeline", "Budget planning", "Book consultation"];
-  }
-  if (memory.projectType === "Interiors") {
-    return ["Room planning", "Material palette", "Execution support", "Book consultation"];
-  }
-  if (memory.projectType === "Renovation") {
-    return ["Renovation scope", "Timeline", "Budget planning", "Book consultation"];
-  }
+// ─── Smart Chips ──────────────────────────────────────────────────────────────
 
-  return ["Services", "Project process", "Budget guidance", "Book consultation"];
+const smartChips = (memory: VisitorMemory): string[] => {
+  if (memory.projectType === "Architecture") return ["Site details", "Concept process", "Budget range", "Book consultation"];
+  if (memory.projectType === "Interiors") return ["Room planning", "Style direction", "Materials", "Book consultation"];
+  if (memory.projectType === "Renovation") return ["Scope clarity", "Timeline", "Budget range", "Book consultation"];
+  return ["Architecture", "Interiors", "Renovation", "Book consultation"];
 };
 
-const addEmojiEveryAlternateBotReply = (
-  text: string,
-  messageCount: number,
-  emojis: string[]
-) => {
-  const botReplyIndex = Math.floor(messageCount / 2) + 1;
-  const shouldAddEmoji = botReplyIndex % 2 === 0;
-  if (!shouldAddEmoji) return text;
-  return `${text} ${randomPick(emojis)}`;
-};
+// ─── Fallback Reply Engine ────────────────────────────────────────────────────
 
-const fallbackReply = (input: string, memory: VisitorMemory, messageCount: number) => {
-  const text = normalize(input);
+const fallbackReply = (
+  input: string,
+  memory: VisitorMemory,
+  msgCount: number
+): { text: string; chips?: string[] } => {
+  const t = normalize(input);
+  void msgCount;
 
-  if (["hi", "hello", "hey", "hii", "yo", "good morning", "good afternoon", "good evening"].includes(text)) {
+  const greetWords = ["hi", "hello", "hey", "hii", "yo", "hola", "sup", "good morning", "good afternoon", "good evening", "namaste"];
+  if (greetWords.some((g) => t === g || t.startsWith(g + " "))) {
     return {
-      text: addEmojiEveryAlternateBotReply(
-        randomPick([
-          "Hey, welcome — tell me what kind of space or project you're planning.",
-          "Hey there — I'm Suyash. Are you looking at architecture, interiors, or a renovation?",
-          "Hi — happy to help. Let me know what you're exploring and I'll guide you step by step.",
-        ]),
-        messageCount,
-        ["👋", "😊", "✨"]
-      ),
+      text: pick([
+        "Hey — welcome to ARCIGN. Tell me what kind of project you have in mind and I'll take it from there.",
+        "Hi there — I'm Suyash. Are you exploring architecture, interiors, or a renovation?",
+        "Hello — good to have you here. What space or project are you thinking about?",
+      ]),
       chips: ["Architecture", "Interiors", "Renovation", "Book consultation"],
     };
   }
 
-  if (containsAny(text, ["services", "what do you do", "what services"])) {
+  if (has(t, ["services", "what do you do", "offer", "offerings", "work on"])) {
     return {
-      text: addEmojiEveryAlternateBotReply(
-        "ARCIGN typically supports architecture design, interior design, bespoke furniture and joinery, material curation, design development, renovation guidance, and execution coordination. If you want, I can narrow this down based on your exact requirement.",
-        messageCount,
-        ["🏡", "🛋️", "📐"]
-      ),
-      chips: ["Architecture", "Interiors", "Furniture & joinery", "Execution support"],
+      text: "ARCIGN handles architecture, interior design, bespoke joinery, material curation, and execution coordination. Want me to walk you through any of these in more detail?",
+      chips: ["Architecture", "Interiors", "Joinery & furniture", "Execution support"],
     };
   }
 
-  if (containsAny(text, ["process", "how do you work", "how does it work", "workflow"])) {
+  if (has(t, ["process", "how do you work", "how does it work", "workflow", "steps", "how it works"])) {
     return {
-      text: addEmojiEveryAlternateBotReply(
-        "A typical project starts with understanding goals, lifestyle needs, site or space conditions, timeline, and budget. After that usually comes concept direction, planning, detailing, material decisions, and then execution support depending on scope.",
-        messageCount,
-        ["🧭", "📋", "✨"]
-      ),
-      chips: ["Concept stage", "Drawings", "Materials", "Execution support"],
+      text: pick([
+        "Every project starts with a discovery session — understanding your goals, lifestyle, site conditions, and budget. From there we move into concept, detailed design, and then execution if needed. What stage are you at?",
+        "Typically: brief → concept → design development → material curation → execution. The depth depends on whether you need full service or design-only. What does your project look like?",
+      ]),
+      chips: ["Early planning", "Design stage", "Execution", "Book consultation"],
     };
   }
 
-  if (containsAny(text, ["budget", "cost", "price", "fees", "charges"])) {
+  if (has(t, ["budget", "cost", "price", "fees", "charges", "how much", "rate", "pricing"])) {
     return {
-      text: addEmojiEveryAlternateBotReply(
-        "Costs depend on project type, area, scope, detailing depth, materials, and how involved the studio needs to be. The most useful first step is sharing project type, city, approximate size, and a rough budget comfort range so the scope can be structured correctly.",
-        messageCount,
-        ["💰", "📊", "🧾"]
-      ),
-      chips: ["Architecture budget", "Interior budget", "Share project details", "Book consultation"],
+      text: pick([
+        "Budget depends on project type, area, scope, and finish level. If you share a rough comfort range, I can give you a much clearer picture of what's possible.",
+        "Costs vary quite a bit based on scope — a full architecture project is different from a single-room interior. What kind of project are you planning?",
+      ]),
+      chips: ["Architecture project", "Interior project", "Renovation", "Share project details"],
     };
   }
 
-  if (containsAny(text, ["timeline", "how long", "how much time", "duration"])) {
+  if (has(t, ["timeline", "how long", "duration", "when", "time frame", "how many months"])) {
     return {
-      text: addEmojiEveryAlternateBotReply(
-        "Timelines depend on whether this is architecture, interiors, or renovation, and whether you need concept only, detailed drawings, or execution coordination as well. Early clarity on scope usually helps avoid delays and keeps decisions cleaner.",
-        messageCount,
-        ["⏳", "📅", "🛠️"]
-      ),
-      chips: ["Architecture timeline", "Interior timeline", "Renovation timeline", "Project process"],
+      text: "Timelines depend on scope — concept-only vs full execution are very different. For interiors, 3–6 months is typical for mid-scale projects. Architecture runs longer. What's your target date?",
+      chips: ["Architecture timeline", "Interior timeline", "Renovation timeline", "Book consultation"],
     };
   }
 
-  if (containsAny(text, ["architecture", "architect", "villa", "house", "residence", "home design"])) {
+  if (has(t, ["architecture", "architect", "new build", "villa design", "house design", "residence", "bungalow", "facade"])) {
     return {
-      text: addEmojiEveryAlternateBotReply(
-        "For architecture projects, the key things I'd usually ask first are: city or location, site status, approximate built-up area, design direction, budget comfort, and timeline expectations. That gives enough context to guide the next step properly.",
-        messageCount,
-        ["📐", "🏡", "🧱"]
-      ),
-      chips: ["Site requirements", "Villa design", "Residence design", "Budget planning"],
+      text: pick([
+        `For an architecture project, I'd start by understanding your site location, built-up area, design direction, and timeline.${memory.city ? ` Since you're in ${memory.city}, we can discuss local site conditions too.` : " Which city is the site in?"}`,
+        "Architecture projects here cover everything from concept design to working drawings and execution oversight. What kind of property are you building?",
+      ]),
+      chips: ["Villa", "Residence", "Site planning", "Facade design"],
     };
   }
 
-  if (containsAny(text, ["interior", "interiors", "living room", "bedroom", "kitchen", "dining", "apartment"])) {
+  if (has(t, ["interior", "interiors", "living room", "bedroom", "kitchen", "dining", "apartment", "flat", "furnish", "decor"])) {
     return {
-      text: addEmojiEveryAlternateBotReply(
-        "For interior projects, we usually need to understand the space type, rooms involved, your preferred mood or style, budget range, how detailed you want the work to go, and whether you need design only or design plus execution support.",
-        messageCount,
-        ["🛋️", "🎨", "✨"]
-      ),
-      chips: ["Living room", "Kitchen", "Bedroom", "Material palette"],
+      text: pick([
+        `Interiors work starts with space type, rooms in scope, style direction, and budget range.${memory.propertyType ? ` For your ${memory.propertyType}, that's a good starting point.` : " What kind of space is this — apartment, villa, or something else?"}`,
+        "For interiors, the most useful things upfront are: which rooms, your preferred mood or style, and whether you need design-only or full execution support.",
+      ]),
+      chips: ["Living room", "Bedroom", "Kitchen", "Full apartment"],
     };
   }
 
-  if (containsAny(text, ["renovation", "remodel", "redo", "refurbish"])) {
+  if (has(t, ["renovation", "remodel", "redo", "refurbish", "upgrade", "revamp"])) {
     return {
-      text: addEmojiEveryAlternateBotReply(
-        "For renovation projects, it helps to know what is staying, what is changing, whether civil work is involved, and how much disruption is acceptable during execution. Renovation planning works best when scope is defined clearly before site work starts.",
-        messageCount,
-        ["🔨", "🏠", "📋"]
-      ),
-      chips: ["Renovation scope", "Site visit", "Budget planning", "Execution support"],
+      text: "Renovation planning works best when we're clear on what's changing and what's staying. Civil work vs soft upgrades have very different timelines and budgets. What's the scope you have in mind?",
+      chips: ["Civil renovation", "Soft upgrade", "Full redo", "Book consultation"],
     };
   }
 
-  if (containsAny(text, ["materials", "material", "finish", "finishes", "palette", "stone", "wood"])) {
+  if (has(t, ["material", "materials", "finish", "finishes", "stone", "wood", "marble", "tile", "palette", "texture"])) {
     return {
-      text: addEmojiEveryAlternateBotReply(
-        "Material curation is a major part of a strong project outcome. Usually the real quality comes from how stone, wood, metal, fabric, plaster, lighting, and furniture work together as one clear language, not from isolated choices.",
-        messageCount,
-        ["🪵", "🪨", "💡"]
-      ),
-      chips: ["Warm minimal palette", "Wood & stone", "Lighting", "Furniture & joinery"],
+      text: "Material selection is where a project really comes alive. The key is building a cohesive language — stone, wood, metal, plaster, lighting — rather than picking individual pieces. Do you have a style direction in mind?",
+      chips: ["Warm palette", "Stone & wood", "Minimal palette", "Share references"],
     };
   }
 
-  if (containsAny(text, ["furniture", "joinery", "wardrobe", "cabinet", "storage"])) {
+  if (has(t, ["furniture", "joinery", "wardrobe", "cabinet", "storage", "tv unit", "bookshelf", "shelf"])) {
     return {
-      text: addEmojiEveryAlternateBotReply(
-        "Yes — bespoke furniture and joinery can be integrated into the design process. This usually helps the final space feel more resolved because storage, proportion, materials, and detailing are designed together rather than added later.",
-        messageCount,
-        ["🪑", "🗄️", "✨"]
-      ),
-      chips: ["Wardrobes", "TV unit", "Kitchen joinery", "Custom furniture"],
+      text: "Bespoke joinery is a strong part of what we do — when furniture is designed alongside the space, the outcome feels much more resolved. Are you looking at specific pieces or full room joinery?",
+      chips: ["Wardrobes", "TV unit", "Kitchen joinery", "Full room joinery"],
     };
   }
 
-  if (containsAny(text, ["site", "site visit", "location", "city", "where"])) {
+  if (has(t, ["style", "look", "aesthetic", "mood", "theme", "vibe", "feel"])) {
     return {
-      text: addEmojiEveryAlternateBotReply(
-        "Location matters because site conditions, vendors, timelines, and execution coordination can vary a lot by city. If you share your city and project type, I can guide you more precisely on the next step.",
-        messageCount,
-        ["📍", "🏙️", "🧭"]
-      ),
-      chips: ["Share city", "Architecture project", "Interior project", "Book consultation"],
+      text: "Rather than just naming a style, think about how you want the space to feel — calm and quiet, warm and tactile, bold and refined, or light and airy. That gives us much better design clarity. Any words that come to mind?",
+      chips: ["Warm minimal", "Luxury", "Clean modern", "Japandi"],
     };
   }
 
-  if (containsAny(text, ["approval", "permissions", "sanction", "authority"])) {
+  if (has(t, ["execution", "on site", "supervision", "contractor", "implementation", "site management"])) {
     return {
-      text: addEmojiEveryAlternateBotReply(
-        "Approval requirements depend on the location, project type, and scope of intervention. For architecture projects especially, it's best to discuss site details and local conditions early so the process can be planned clearly.",
-        messageCount,
-        ["📑", "🏛️", "📐"]
-      ),
-      chips: ["Site requirements", "Architecture project", "Consultation"],
+      text: "Execution support means we stay involved through site visits, material coordination, and vendor alignment to protect design intent. It varies by scope — some clients need full oversight, others just milestone reviews. What are you thinking?",
+      chips: ["Full execution", "Milestone reviews", "Design only", "Book consultation"],
     };
   }
 
-  if (containsAny(text, ["what should i send", "what to send", "checklist", "documents"])) {
+  if (has(t, ["city", "location", "where", "site", "place", "region"])) {
     return {
-      text: addEmojiEveryAlternateBotReply(
-        "A strong first inquiry usually includes your city, project type, property type, approximate size, stage of project, target timeline, budget comfort if known, and a few inspiration images or references. Even rough information is enough to start.",
-        messageCount,
-        ["📁", "📝", "✨"]
-      ),
-      chips: ["City", "Project type", "Budget", "Inspiration references"],
+      text: "Location matters — local site conditions, vendors, and logistics vary significantly. Which city is your project in?",
+      chips: ["Bangalore", "Mumbai", "Delhi", "Other city"],
     };
   }
 
-  if (containsAny(text, ["style", "look", "aesthetic", "mood", "theme"])) {
+  if (has(t, ["commercial", "office", "workspace", "hospitality", "hotel", "restaurant", "retail", "showroom"])) {
     return {
-      text: addEmojiEveryAlternateBotReply(
-        "The most useful way to define style is not just naming a look, but describing how you want the space to feel — calm, warm, minimal, tactile, bold, quiet, luxurious, earthy, or highly refined. That usually gives much better design clarity.",
-        messageCount,
-        ["🎨", "✨", "🧠"]
-      ),
-      chips: ["Warm minimal", "Modern", "Luxury", "Contemporary"],
+      text: "Commercial projects need early clarity around brand expression, footfall, function, and user experience. What type of space is this — office, hospitality, retail?",
+      chips: ["Office", "Hospitality", "Retail", "Mixed use"],
     };
   }
 
-  if (containsAny(text, ["execution", "site management", "contractor", "supervision", "on site"])) {
+  if (has(t, ["approval", "permission", "sanction", "authority", "municipal", "bmrda", "bbmp"])) {
     return {
-      text: addEmojiEveryAlternateBotReply(
-        "Execution support can include detail clarification, material coordination, vendor alignment, site reviews, and helping protect the design intent during implementation. The exact involvement depends on project scope and location.",
-        messageCount,
-        ["🛠️", "📋", "🤝"]
-      ),
-      chips: ["Execution support", "Site reviews", "Vendor coordination", "Scope planning"],
+      text: "Approval requirements depend on the city, site type, and scope. We can walk you through what's applicable once we know your location and project details. Where is the site?",
+      chips: ["Share city", "Architecture project", "Book consultation"],
     };
   }
 
-  if (containsAny(text, ["commercial", "office", "workspace", "hospitality"])) {
+  if (has(t, ["send", "share", "checklist", "document", "what do you need", "start with"])) {
     return {
-      text: addEmojiEveryAlternateBotReply(
-        "Commercial projects usually need early clarity around function, brand expression, circulation, user experience, timeline pressure, and execution practicality. If this is a commercial project, tell me the space type and city.",
-        messageCount,
-        ["🏢", "📍", "🧭"]
-      ),
-      chips: ["Office", "Hospitality", "Retail", "Share city"],
+      text: "A good starting point: project type, city, property type, approximate area, stage you're at, rough budget range, and 2–3 reference images if you have them. Even rough info is enough to begin.",
+      chips: ["Architecture", "Interiors", "Renovation", "Book consultation"],
     };
   }
 
-  if (containsAny(text, ["start", "begin", "next step", "project"])) {
+  if (has(t, ["lighting", "light", "lamps", "fixtures", "ambience", "ambient"])) {
     return {
-      text: addEmojiEveryAlternateBotReply(
-        "The best next step is sharing your project basics clearly: what the project is, where it is, what stage it's in, how you want it to feel, and what kind of timeline and budget comfort you have. Once that's clear, everything else becomes easier.",
-        messageCount,
-        ["🚀", "📋", "✨"]
-      ),
+      text: "Lighting defines mood more than most people realize. We approach it as layers — ambient, task, accent — designed alongside material choices. What kind of space are you planning this for?",
+      chips: ["Living room", "Bedroom", "Kitchen", "Full project"],
+    };
+  }
+
+  if (has(t, ["start", "begin", "next step", "explore services", "start a project"])) {
+    return {
+      text: pick([
+        "The best first step is sharing the basics — project type, city, stage, style direction, and a rough budget range. Once I have that, I can guide you precisely.",
+        "Let's start with what the project is, where it is, and how far along you are. That gives me enough to point you in the right direction.",
+      ]),
       chips: ["Architecture", "Interiors", "Renovation", "Book consultation"],
     };
   }
 
   return {
-    text: addEmojiEveryAlternateBotReply(
-      randomPick([
-        "I can help with architecture, interiors, renovation planning, design process, budget clarity, timelines, materials, execution support, and how to structure your inquiry. What would you like to explore first?",
-        "Tell me a little about your project and I'll guide you in a practical way.",
-        "Happy to help — are you exploring a new build, interiors, a renovation, or just trying to understand the process?",
-      ]),
-      messageCount,
-      ["😊", "✨", "🤝"]
-    ),
-    chips: buildHelpfulPromptChips(memory),
+    text: pick([
+      "Tell me a bit more about the project — I'll guide you from there.",
+      "Happy to help — is this about architecture, interiors, or a renovation?",
+      "I can help with project scope, timelines, budget clarity, materials, or booking a consultation. What would be most useful right now?",
+    ]),
+    chips: smartChips(memory),
   };
 };
+
+// ─── Typing Delay ─────────────────────────────────────────────────────────────
+
+const typingDelay = (text: string): number => {
+  const base = 700;
+  const perChar = 16;
+  const max = 2400;
+  return Math.min(base + text.length * perChar, max);
+};
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export const ChatWidget = () => {
   const [visible, setVisible] = useState(false);
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
-  const [consultationStage, setConsultationStage] = useState<ConsultationStage>("idle");
+  const [consultStage, setConsultStage] = useState<ConsultationStage>("idle");
+  const [memory, setMemory] = useState<VisitorMemory>({});
 
   const timeMeta = useMemo(() => getTimeMeta(), []);
-  const initialGreeting = useMemo(() => {
-    return `${timeMeta.greeting} — I'm Suyash, Live agent. ${timeMeta.mood}. I can help with architecture, interiors, renovation planning, timelines, materials, scope clarity, and getting your inquiry ready. 😊`;
-  }, [timeMeta]);
 
-  const [memory, setMemory] = useState<VisitorMemory>({});
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "m1",
+  const initialMessage = useMemo<Message>(
+    () => ({
+      id: "init",
       sender: "bot",
-      text: initialGreeting,
-      chips: ["Start a project", "Services", "Project process", "Book consultation"],
-    },
-  ]);
+      text: pick([
+        `${timeMeta.greeting} — I'm Suyash, from ARCIGN. Tell me about your project and I'll take it from there. 😊`,
+        `${timeMeta.greeting} — welcome to ARCIGN. Whether it's architecture, interiors, or a renovation, I'm here to help you get started.`,
+        `${timeMeta.greeting}. I'm Suyash — the first point of contact here at ARCIGN. What kind of space are you planning?`,
+      ]),
+      chips: ["Architecture", "Interiors", "Renovation", "Book consultation"],
+    }),
+    [timeMeta]
+  );
 
-  const endRef = useRef<HTMLDivElement | null>(null);
+  const [messages, setMessages] = useState<Message[]>([initialMessage]);
+  const endRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // ── Restore from localStorage ──────────────────────────────────────────────
 
   useEffect(() => {
     try {
-      const savedMessages = localStorage.getItem(CHAT_STORAGE_KEY);
-      const savedMemory = localStorage.getItem(MEMORY_STORAGE_KEY);
-      const savedConsultStage = localStorage.getItem(CONSULTATION_STAGE_KEY);
+      const msgs = localStorage.getItem(CHAT_KEY);
+      const mem = localStorage.getItem(MEMORY_KEY);
+      const stage = localStorage.getItem(CONSULT_KEY);
 
-      if (savedMessages) {
-        const parsed = JSON.parse(savedMessages) as Message[];
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setMessages(parsed);
-        }
+      if (msgs) {
+        const parsed = JSON.parse(msgs) as Message[];
+        if (Array.isArray(parsed) && parsed.length > 0) setMessages(parsed);
       }
-
-      if (savedMemory) {
-        const parsedMemory = JSON.parse(savedMemory) as VisitorMemory;
-        if (parsedMemory && typeof parsedMemory === "object") {
-          setMemory(parsedMemory);
-        }
+      if (mem) {
+        const parsedMem = JSON.parse(mem) as VisitorMemory;
+        if (parsedMem && typeof parsedMem === "object") setMemory(parsedMem);
       }
-
-      if (
-        savedConsultStage === "idle" ||
-        savedConsultStage === "ask_name" ||
-        savedConsultStage === "ask_phone" ||
-        savedConsultStage === "done"
-      ) {
-        setConsultationStage(savedConsultStage);
+      if (stage && ["idle", "ask_name", "ask_phone", "done"].includes(stage)) {
+        setConsultStage(stage as ConsultationStage);
       }
-    } catch {
-      // ignore
-    }
+    } catch { /* ignore */ }
   }, []);
 
+  // ── Persist ────────────────────────────────────────────────────────────────
+
   useEffect(() => {
-    try {
-      localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messages));
-    } catch {
-      // ignore
-    }
+    try { localStorage.setItem(CHAT_KEY, JSON.stringify(messages)); } catch { /* ignore */ }
   }, [messages]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(MEMORY_STORAGE_KEY, JSON.stringify(memory));
-    } catch {
-      // ignore
-    }
+    try { localStorage.setItem(MEMORY_KEY, JSON.stringify(memory)); } catch { /* ignore */ }
   }, [memory]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(CONSULTATION_STAGE_KEY, consultationStage);
-    } catch {
-      // ignore
-    }
-  }, [consultationStage]);
+    try { localStorage.setItem(CONSULT_KEY, consultStage); } catch { /* ignore */ }
+  }, [consultStage]);
+
+  // ── Scroll trigger ─────────────────────────────────────────────────────────
 
   useEffect(() => {
-    const handleScroll = () => {
-      const triggerPoint = window.innerHeight * 0.82;
-      setVisible(window.scrollY > triggerPoint);
-    };
-
-    handleScroll();
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
+    const onScroll = () => setVisible(window.scrollY > window.innerHeight * 0.6);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  // ── Auto-scroll ────────────────────────────────────────────────────────────
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, typing, open]);
 
-  const getBotReply = async (text: string, memoryState: VisitorMemory, history: Message[]) => {
-    try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          message: text,
-          agentName: "Suyash",
-          company: "ARCIGN",
-          role: "Live agent",
-          timeOfDay: timeMeta.greeting,
-          visitorMemory: memoryState,
-          recentMessages: history.slice(-8),
-          systemContext:
-            "You are Suyash, a premium architecture and interiors support agent for ARCIGN. Be warm, practical, concise, tasteful, and helpful. Use occasional relevant emojis naturally. Guide users toward a consultation without sounding pushy.",
-        }),
-      });
+  // ── Focus on open ──────────────────────────────────────────────────────────
 
-      if (!res.ok) throw new Error("AI endpoint unavailable");
+  useEffect(() => {
+    if (open) setTimeout(() => inputRef.current?.focus(), 350);
+  }, [open]);
 
-      const data = await res.json();
+  // ── Add bot message ────────────────────────────────────────────────────────
 
-      if (data?.reply && typeof data.reply === "string") {
-        return {
-          text: addEmojiEveryAlternateBotReply(
-            data.reply,
-            history.length,
-            ["😊", "✨", "🤝"]
-          ),
-          chips: Array.isArray(data.chips) ? data.chips : buildHelpfulPromptChips(memoryState),
-        };
-      }
-
-      throw new Error("Invalid AI response");
-    } catch {
-      return fallbackReply(text, memoryState, history.length);
-    }
-  };
-
-  const addBotMessage = (text: string, chips?: string[]) => {
+  const addBot = useCallback((text: string, chips?: string[]) => {
     setMessages((prev) => [
       ...prev,
-      {
-        id: `b-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        sender: "bot",
-        text,
-        chips,
-      },
+      { id: `b-${uid()}`, sender: "bot", text, chips },
     ]);
-  };
+  }, []);
 
-  const shouldStartConsultationFlow = (text: string) => {
-    const normalized = normalize(text);
-    return containsAny(normalized, [
-      "book consultation",
-      "consultation",
-      "book a consultation",
-      "schedule consultation",
-      "book meeting",
-      "book call",
-      "start consultation",
-    ]);
-  };
+  // ── API with fallback ──────────────────────────────────────────────────────
 
-  const sendMessage = async (rawText: string) => {
-    const text = rawText.trim();
-    if (!text) return;
+  const getBotReply = useCallback(
+    async (
+      text: string,
+      mem: VisitorMemory,
+      history: Message[]
+    ): Promise<{ text: string; chips?: string[] }> => {
+      try {
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: text,
+            agentName: "Suyash",
+            company: "ARCIGN",
+            role: "Live agent",
+            timeOfDay: timeMeta.greeting,
+            visitorMemory: mem,
+            recentMessages: history.slice(-8),
+            systemContext:
+              "You are Suyash, a warm, knowledgeable live support agent for ARCIGN Architects. Be concise, natural, and premium. Never sound robotic. Guide toward consultation without being pushy. Use emojis sparingly and only when natural.",
+          }),
+        });
+        if (!res.ok) throw new Error("unavailable");
+        const data = await res.json();
+        if (data?.reply && typeof data.reply === "string") {
+          return {
+            text: data.reply,
+            chips: Array.isArray(data.chips) ? data.chips : smartChips(mem),
+          };
+        }
+        throw new Error("bad response");
+      } catch {
+        return fallbackReply(text, mem, history.length);
+      }
+    },
+    [timeMeta]
+  );
 
-    const updatedMemory = extractMemoryFromText(text, memory);
-    setMemory(updatedMemory);
+  // ── Send message ───────────────────────────────────────────────────────────
 
-    const userMessage: Message = {
-      id: `u-${Date.now()}`,
-      sender: "user",
-      text,
-    };
+  const sendMessage = useCallback(
+    async (rawText: string) => {
+      const text = rawText.trim();
+      if (!text || typing) return;
 
-    const nextHistory = [...messages, userMessage];
-    setMessages(nextHistory);
-    setInput("");
+      const updatedMemory = extractMemory(text, memory);
+      setMemory(updatedMemory);
 
-    if (consultationStage === "ask_name") {
-      const detectedName = extractLikelyName(text);
-      const finalName = detectedName || text.trim();
+      const userMsg: Message = { id: `u-${uid()}`, sender: "user", text };
+      const nextHistory = [...messages, userMsg];
+      setMessages(nextHistory);
+      setInput("");
 
-      const nextMemory = {
-        ...updatedMemory,
-        name: finalName,
-      };
-      setMemory(nextMemory);
-      setConsultationStage("ask_phone");
+      // ── Consultation flow ──
+      if (consultStage === "ask_name") {
+        const name = extractName(text) ?? text.trim();
+        setMemory((m) => ({ ...m, name }));
+        setConsultStage("ask_phone");
+        setTyping(true);
+        setTimeout(() => {
+          addBot(`Thanks${name ? `, ${name}` : ""}. Could you share your WhatsApp or phone number? 📱`);
+          setTyping(false);
+        }, 700);
+        return;
+      }
 
+      if (consultStage === "ask_phone") {
+        if (!isValidPhone(text)) {
+          setTyping(true);
+          setTimeout(() => {
+            addBot("Could you double-check that number? I want to make sure the team can reach you. 😊");
+            setTyping(false);
+          }, 600);
+          return;
+        }
+        const phone = cleanPhone(text);
+        setMemory((m) => ({ ...m, phone }));
+        setConsultStage("done");
+        setTyping(true);
+        setTimeout(() => {
+          addBot(
+            `Perfect${memory.name ? `, ${memory.name}` : ""}. Our team will reach out to you shortly. Thanks for choosing ARCIGN. 😎👍🏻`
+          );
+          setTyping(false);
+        }, 750);
+        return;
+      }
+
+      // ── Consultation trigger ──
+      const consultTriggers = [
+        "book consultation", "consultation", "book a call", "schedule",
+        "book meeting", "start consultation", "book call",
+      ];
+      if (has(normalize(text), consultTriggers)) {
+        setConsultStage("ask_name");
+        setTyping(true);
+        setTimeout(() => {
+          addBot("Of course — happy to set that up. May I know your name? 😊");
+          setTyping(false);
+        }, 650);
+        return;
+      }
+
+      // ── Normal reply ──
       setTyping(true);
+      const reply = await getBotReply(text, updatedMemory, nextHistory);
       setTimeout(() => {
-        addBotMessage("Please send your Phone/Whatsapp Number 📱");
+        addBot(reply.text, reply.chips);
         setTyping(false);
-      }, 550);
-      return;
-    }
+      }, typingDelay(reply.text));
+    },
+    [typing, memory, messages, consultStage, addBot, getBotReply]
+  );
 
-    if (consultationStage === "ask_phone") {
-      const finalPhone = cleanPhone(text);
-      const nextMemory = {
-        ...updatedMemory,
-        phone: finalPhone,
-      };
-      setMemory(nextMemory);
-      setConsultationStage("done");
+  // ── Reset ──────────────────────────────────────────────────────────────────
 
-      setTyping(true);
-      setTimeout(() => {
-        addBotMessage("Thanks for visiting our website. Our team will contact you at the earliest. 😎 👍🏻");
-        setTyping(false);
-      }, 550);
-      return;
-    }
-
-    if (shouldStartConsultationFlow(text)) {
-      setConsultationStage("ask_name");
-      setTyping(true);
-      setTimeout(() => {
-        addBotMessage("Your Good Name sir 😊");
-        setTyping(false);
-      }, 550);
-      return;
-    }
-
-    setTyping(true);
-    const reply = await getBotReply(text, updatedMemory, nextHistory);
-
-    setTimeout(() => {
-      addBotMessage(reply.text, reply.chips);
-      setTyping(false);
-    }, 650);
-  };
-
-  const resetConversation = () => {
-    const fresh = [
-      {
-        id: "m1",
-        sender: "bot" as const,
-        text: initialGreeting,
-        chips: ["Start a project", "Services", "Project process", "Book consultation"],
-      },
-    ];
-    setMessages(fresh);
+  const reset = useCallback(() => {
+    setMessages([initialMessage]);
     setMemory({});
-    setConsultationStage("idle");
+    setConsultStage("idle");
     try {
-      localStorage.removeItem(CHAT_STORAGE_KEY);
-      localStorage.removeItem(MEMORY_STORAGE_KEY);
-      localStorage.removeItem(CONSULTATION_STAGE_KEY);
-    } catch {
-      // ignore
-    }
-  };
+      localStorage.removeItem(CHAT_KEY);
+      localStorage.removeItem(MEMORY_KEY);
+      localStorage.removeItem(CONSULT_KEY);
+    } catch { /* ignore */ }
+  }, [initialMessage]);
+
+  // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <AnimatePresence>
-      {visible && (
-        <>
-          {!open && (
-            <motion.button
-              type="button"
-              onClick={() => setOpen(true)}
-              initial={{ opacity: 0, y: 16, scale: 0.92 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 16, scale: 0.92 }}
-              transition={{ duration: 0.35, ease: [0.2, 0.7, 0.2, 1] }}
-              className="fixed bottom-5 right-5 z-[70] flex items-center gap-3 rounded-full border border-white/10 bg-surface-deep px-4 py-3 text-background shadow-[0_20px_60px_rgba(0,0,0,0.28)] backdrop-blur-md md:bottom-7 md:right-7"
-            >
-              <span className="relative h-11 w-11 overflow-hidden rounded-full border border-white/15">
-                <img
-                  src={suyashPhoto}
-                  alt="Suyash"
-                  className="h-full w-full object-cover"
-                />
-              </span>
+    <>
+      <style>{`
+        @keyframes arcignDot {
+          0%, 60%, 100% { transform: translateY(0); opacity: 0.25; }
+          30% { transform: translateY(-5px); opacity: 1; }
+        }
+        .arcign-scroll::-webkit-scrollbar { width: 0; }
+        .arcign-chips::-webkit-scrollbar { height: 0; }
+      `}</style>
 
-              <span className="hidden text-left sm:block">
-                <span className="flex items-center gap-2">
-                  <span className="block text-[11px] uppercase tracking-[0.24em] text-black">
-                    Suyash
+      <AnimatePresence>
+        {visible && (
+          <>
+            {/* ── Launcher ── */}
+            {!open && (
+              <motion.button
+                key="launcher"
+                type="button"
+                onClick={() => setOpen(true)}
+                initial={{ opacity: 0, y: 20, scale: 0.88 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 20, scale: 0.88 }}
+                transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+                aria-label="Open chat"
+                className="fixed bottom-6 right-6 z-[70] flex items-center gap-3.5 rounded-full border border-white/10 bg-surface-deep px-4 py-2.5 shadow-[0_20px_60px_rgba(0,0,0,0.30)] backdrop-blur-xl transition-transform hover:scale-[1.02] active:scale-[0.98] md:bottom-8 md:right-8"
+              >
+                {/* Avatar with online dot */}
+                <span className="relative shrink-0">
+                  <span className="block h-11 w-11 overflow-hidden rounded-full ring-1 ring-white/18">
+                    <img src={suyashPhoto} alt="Suyash" className="h-full w-full object-cover" />
                   </span>
-
-                  <span className="relative inline-flex h-2.5 w-2.5">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500/50"></span>
-                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-white"></span>
+                  <span className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-surface-deep ring-[1.5px] ring-white/10">
+                    <span className="relative flex h-2 w-2">
+                      <span className="absolute h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                      <span className="relative h-2 w-2 rounded-full bg-emerald-400" />
+                    </span>
                   </span>
                 </span>
 
-                <span className="block text-sm text-black">Live agent</span>
-              </span>
-            </motion.button>
-          )}
+                <span className="hidden flex-col text-left sm:flex">
+                  <span className="text-[10px] uppercase tracking-[0.26em] text-white/45 leading-none mb-0.5">
+                    ARCIGN Support
+                  </span>
+                  <span className="text-[13px] font-medium leading-snug text-white">
+                    Suyash · Live
+                  </span>
+                </span>
+              </motion.button>
+            )}
 
-          {open && (
-            <motion.div
-              initial={{ opacity: 0, y: 18, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 18, scale: 0.96 }}
-              transition={{ duration: 0.35, ease: [0.2, 0.7, 0.2, 1] }}
-              className="fixed bottom-5 right-5 z-[80] w-[calc(100vw-24px)] max-w-[390px] overflow-hidden rounded-[28px] border border-black/10 bg-background shadow-[0_30px_90px_rgba(0,0,0,0.22)] md:bottom-7 md:right-7"
-            >
-              <div className="flex items-center justify-between border-b border-black/10 bg-surface px-5 py-4">
-                <div className="flex items-center gap-3">
-                  <div className="relative h-11 w-11 overflow-hidden rounded-full border border-black/10">
-                    <img
-                      src={suyashPhoto}
-                      alt="Suyash"
-                      className="h-full w-full object-cover"
-                    />
-                  </div>
-
-                  <div>
-                    <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
-                      ARCIGN Support
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-foreground">
+            {/* ── Chat panel ── */}
+            {open && (
+              <motion.div
+                key="chat"
+                initial={{ opacity: 0, y: 28, scale: 0.94 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 28, scale: 0.94 }}
+                transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+                className="fixed bottom-6 right-6 z-[80] flex w-[calc(100vw-20px)] max-w-[400px] flex-col overflow-hidden rounded-[22px] border border-black/8 bg-background shadow-[0_28px_72px_rgba(0,0,0,0.16)] md:bottom-8 md:right-8"
+                style={{ maxHeight: "min(680px, calc(100svh - 32px))" }}
+              >
+                {/* ── Header ── */}
+                <div className="flex shrink-0 items-center justify-between border-b border-black/8 bg-surface px-5 py-4">
+                  <div className="flex items-center gap-3">
+                    <div className="relative shrink-0">
+                      <div className="h-10 w-10 overflow-hidden rounded-full ring-1 ring-black/10">
+                        <img src={suyashPhoto} alt="Suyash" className="h-full w-full object-cover" />
+                      </div>
+                      <span className="absolute -bottom-0.5 -right-0.5 flex h-[13px] w-[13px] items-center justify-center rounded-full bg-white ring-1 ring-black/8">
+                        <span className="relative flex h-[7px] w-[7px]">
+                          <span className="absolute h-full w-full animate-ping rounded-full bg-emerald-500 opacity-60" />
+                          <span className="relative h-[7px] w-[7px] rounded-full bg-emerald-500" />
+                        </span>
+                      </span>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground leading-none mb-0.5">
+                        ARCIGN
+                      </p>
+                      <p className="text-[13.5px] font-medium leading-snug text-foreground">
                         Suyash, Live agent
-                      </span>
-                      <span className="relative inline-flex h-2.5 w-2.5">
-                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500/50"></span>
-                        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-white"></span>
-                      </span>
+                      </p>
                     </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={reset}
+                      className="hidden h-9 items-center rounded-full border border-black/8 px-3.5 text-[10.5px] uppercase tracking-[0.16em] text-muted-foreground transition hover:border-black/16 hover:text-foreground sm:flex"
+                    >
+                      Reset
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setOpen(false)}
+                      aria-label="Close"
+                      className="flex h-9 w-9 items-center justify-center rounded-full border border-black/8 text-muted-foreground transition hover:border-black/16 hover:text-foreground"
+                    >
+                      <X className="h-[15px] w-[15px]" />
+                    </button>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={resetConversation}
-                    className="hidden rounded-full border border-black/10 px-3 py-2 text-[11px] uppercase tracking-[0.18em] text-foreground transition hover:bg-black/5 sm:inline-flex"
-                  >
-                    Reset
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setOpen(false)}
-                    className="flex h-10 w-10 items-center justify-center rounded-full border border-black/10 text-foreground transition hover:bg-black/5"
-                    aria-label="Close chat"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="max-h-[58vh] min-h-[360px] overflow-y-auto bg-background px-4 py-4 md:min-h-[420px]">
-                <div className="space-y-4">
-                  {messages.map((message) => (
-                    <div key={message.id}>
-                      <div
-                        className={`flex ${
-                          message.sender === "user" ? "justify-end" : "justify-start"
-                        }`}
+                {/* ── Messages ── */}
+                <div className="arcign-scroll flex-1 overflow-y-auto overscroll-contain px-4 py-5">
+                  <div className="space-y-4">
+                    {messages.map((msg, i) => (
+                      <motion.div
+                        key={msg.id}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.28, delay: i === 0 ? 0 : 0.04 }}
                       >
-                        <div
-                          className={`max-w-[88%] rounded-[22px] px-4 py-3 text-[14px] leading-relaxed ${
-                            message.sender === "user"
-                              ? "bg-surface-deep text-background"
-                              : "border border-black/6 bg-surface text-foreground"
-                          }`}
+                        <div className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}>
+                          <div
+                            className={`
+                              max-w-[85%] px-4 py-3 text-[13.5px] leading-[1.62]
+                              ${msg.sender === "user"
+                                ? "rounded-[18px] rounded-br-[5px] bg-surface-deep text-background"
+                                : "rounded-[18px] rounded-bl-[5px] border border-black/7 bg-surface text-foreground"
+                              }
+                            `}
+                          >
+                            {msg.text}
+                          </div>
+                        </div>
+
+                        {msg.sender === "bot" && msg.chips && msg.chips.length > 0 && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 5 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.12, duration: 0.26 }}
+                            className="mt-2.5 flex flex-wrap gap-2"
+                          >
+                            {msg.chips.map((chip) => (
+                              <button
+                                key={chip}
+                                type="button"
+                                onClick={() => void sendMessage(chip)}
+                                className="rounded-full border border-black/10 bg-background px-3.5 py-[7px] text-[12px] leading-none text-foreground transition hover:border-black/18 hover:bg-surface active:scale-[0.96]"
+                              >
+                                {chip}
+                              </button>
+                            ))}
+                          </motion.div>
+                        )}
+                      </motion.div>
+                    ))}
+
+                    {/* Typing indicator */}
+                    <AnimatePresence>
+                      {typing && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 4 }}
+                          transition={{ duration: 0.22 }}
+                          className="flex justify-start"
                         >
-                          {message.text}
-                        </div>
-                      </div>
-
-                      {message.sender === "bot" && message.chips && message.chips.length > 0 && (
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {message.chips.map((chip) => (
-                            <button
-                              key={chip}
-                              type="button"
-                              onClick={() => void sendMessage(chip)}
-                              className="rounded-full border border-black/10 bg-background px-3 py-2 text-[12px] text-foreground transition hover:bg-surface"
-                            >
-                              {chip}
-                            </button>
-                          ))}
-                        </div>
+                          <div className="flex items-center gap-[5px] rounded-[18px] rounded-bl-[5px] border border-black/7 bg-surface px-4 py-3.5">
+                            {[0, 1, 2].map((i) => (
+                              <span
+                                key={i}
+                                className="h-[6px] w-[6px] rounded-full bg-foreground/25"
+                                style={{ animation: `arcignDot 1.3s ease-in-out ${i * 0.18}s infinite` }}
+                              />
+                            ))}
+                          </div>
+                        </motion.div>
                       )}
-                    </div>
-                  ))}
+                    </AnimatePresence>
 
-                  {typing && (
-                    <div className="flex justify-start">
-                      <div className="rounded-[22px] border border-black/6 bg-surface px-4 py-3 text-[14px] text-foreground">
-                        <div className="flex items-center gap-2">
-                          <Sparkles className="h-4 w-4 text-bronze" />
-                          <span>Suyash is typing…</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <div ref={endRef} />
-                </div>
-              </div>
-
-              <div className="border-t border-black/10 bg-background px-4 py-4">
-                <div className="mb-3 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => void sendMessage("Start a project")}
-                    className="rounded-full border border-black/10 bg-surface px-3 py-2 text-[12px] text-foreground transition hover:bg-black hover:text-white"
-                  >
-                    Start a project
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void sendMessage("Project process")}
-                    className="rounded-full border border-black/10 bg-surface px-3 py-2 text-[12px] text-foreground transition hover:bg-black hover:text-white"
-                  >
-                    Project process
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void sendMessage("Budget guidance")}
-                    className="rounded-full border border-black/10 bg-surface px-3 py-2 text-[12px] text-foreground transition hover:bg-black hover:text-white"
-                  >
-                    Budget guidance
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void sendMessage("Book consultation")}
-                    className="rounded-full border border-black/10 bg-surface px-3 py-2 text-[12px] text-foreground transition hover:bg-black hover:text-white"
-                  >
-                    Book consultation
-                  </button>
+                    <div ref={endRef} />
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-2 rounded-full border border-black/10 bg-surface px-2 py-2">
-                  <input
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") void sendMessage(input);
-                    }}
-                    placeholder="Ask Suyash about your project..."
-                    className="h-11 flex-1 bg-transparent px-3 text-[14px] text-foreground outline-none placeholder:text-muted-foreground"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => void sendMessage(input)}
-                    className="flex h-11 w-11 items-center justify-center rounded-full bg-surface-deep text-background transition hover:scale-[1.03]"
-                    aria-label="Send message"
-                  >
-                    <Send className="h-4 w-4" />
-                  </button>
+                {/* ── Quick chips ── */}
+                <div className="shrink-0 border-t border-black/7 bg-background px-4 pt-3 pb-1">
+                  <div className="arcign-chips flex gap-2 overflow-x-auto pb-2">
+                    {["Start a project", "Explore services", "Budget guidance", "Book consultation"].map((chip) => (
+                      <button
+                        key={chip}
+                        type="button"
+                        onClick={() => void sendMessage(chip)}
+                        className="shrink-0 rounded-full border border-black/10 bg-surface px-3.5 py-[7px] text-[11.5px] leading-none text-foreground whitespace-nowrap transition hover:bg-black hover:text-white hover:border-black active:scale-[0.96]"
+                      >
+                        {chip}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            </motion.div>
-          )}
-        </>
-      )}
-    </AnimatePresence>
+
+                {/* ── Input ── */}
+                <div className="shrink-0 px-4 pb-4 pt-2">
+                  <div className="flex items-center gap-2 rounded-[13px] border border-black/10 bg-surface px-3 py-2 transition-colors focus-within:border-black/22">
+                    <input
+                      ref={inputRef}
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          void sendMessage(input);
+                        }
+                      }}
+                      placeholder="Ask Suyash anything…"
+                      autoComplete="off"
+                      className="h-10 flex-1 bg-transparent text-[13.5px] text-foreground outline-none placeholder:text-muted-foreground/65"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void sendMessage(input)}
+                      disabled={!input.trim() || typing}
+                      aria-label="Send"
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-surface-deep text-background transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-25 active:scale-95"
+                    >
+                      <Send className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </>
+        )}
+      </AnimatePresence>
+    </>
   );
 };
