@@ -145,23 +145,6 @@ const extractMemoryFromText = (input: string, current: VisitorMemory): VisitorMe
   return next;
 };
 
-const memorySummary = (memory: VisitorMemory) => {
-  const parts = [
-    memory.name ? `name: ${memory.name}` : null,
-    memory.city ? `city: ${memory.city}` : null,
-    memory.projectType ? `project: ${memory.projectType}` : null,
-    memory.propertyType ? `property: ${memory.propertyType}` : null,
-    memory.roomType ? `room: ${memory.roomType}` : null,
-    memory.style ? `style: ${memory.style}` : null,
-    memory.budget ? `budget: ${memory.budget}` : null,
-    memory.timeline ? `timeline: ${memory.timeline}` : null,
-    memory.stage ? `stage: ${memory.stage}` : null,
-    memory.phone ? `phone: ${memory.phone}` : null,
-  ].filter(Boolean);
-
-  return parts.length ? parts.join(" · ") : "No saved visitor context yet";
-};
-
 const buildHelpfulPromptChips = (memory: VisitorMemory) => {
   if (memory.projectType === "Architecture") {
     return ["Site requirements", "Timeline", "Budget planning", "Book consultation"];
@@ -194,9 +177,9 @@ const fallbackReply = (input: string, memory: VisitorMemory, messageCount: numbe
     return {
       text: addEmojiEveryAlternateBotReply(
         randomPick([
-          "Hey, welcome — tell me what kind of space or project you’re planning.",
-          "Hey there — I’m Suyash. Are you looking at architecture, interiors, or a renovation?",
-          "Hi — happy to help. Let me know what you're exploring and I’ll guide you step by step.",
+          "Hey, welcome — tell me what kind of space or project you're planning.",
+          "Hey there — I'm Suyash. Are you looking at architecture, interiors, or a renovation?",
+          "Hi — happy to help. Let me know what you're exploring and I'll guide you step by step.",
         ]),
         messageCount,
         ["👋", "😊", "✨"]
@@ -252,7 +235,7 @@ const fallbackReply = (input: string, memory: VisitorMemory, messageCount: numbe
   if (containsAny(text, ["architecture", "architect", "villa", "house", "residence", "home design"])) {
     return {
       text: addEmojiEveryAlternateBotReply(
-        "For architecture projects, the key things I’d usually ask first are: city or location, site status, approximate built-up area, design direction, budget comfort, and timeline expectations. That gives enough context to guide the next step properly.",
+        "For architecture projects, the key things I'd usually ask first are: city or location, site status, approximate built-up area, design direction, budget comfort, and timeline expectations. That gives enough context to guide the next step properly.",
         messageCount,
         ["📐", "🏡", "🧱"]
       ),
@@ -318,7 +301,7 @@ const fallbackReply = (input: string, memory: VisitorMemory, messageCount: numbe
   if (containsAny(text, ["approval", "permissions", "sanction", "authority"])) {
     return {
       text: addEmojiEveryAlternateBotReply(
-        "Approval requirements depend on the location, project type, and scope of intervention. For architecture projects especially, it’s best to discuss site details and local conditions early so the process can be planned clearly.",
+        "Approval requirements depend on the location, project type, and scope of intervention. For architecture projects especially, it's best to discuss site details and local conditions early so the process can be planned clearly.",
         messageCount,
         ["📑", "🏛️", "📐"]
       ),
@@ -370,21 +353,10 @@ const fallbackReply = (input: string, memory: VisitorMemory, messageCount: numbe
     };
   }
 
-  if (containsAny(text, ["memory", "remember", "what do you know"])) {
-    return {
-      text: addEmojiEveryAlternateBotReply(
-        `Here’s what I currently know from this chat: ${memorySummary(memory)}.`,
-        messageCount,
-        ["🧠", "✨"]
-      ),
-      chips: buildHelpfulPromptChips(memory),
-    };
-  }
-
   if (containsAny(text, ["start", "begin", "next step", "project"])) {
     return {
       text: addEmojiEveryAlternateBotReply(
-        "The best next step is sharing your project basics clearly: what the project is, where it is, what stage it’s in, how you want it to feel, and what kind of timeline and budget comfort you have. Once that’s clear, everything else becomes easier.",
+        "The best next step is sharing your project basics clearly: what the project is, where it is, what stage it's in, how you want it to feel, and what kind of timeline and budget comfort you have. Once that's clear, everything else becomes easier.",
         messageCount,
         ["🚀", "📋", "✨"]
       ),
@@ -396,7 +368,7 @@ const fallbackReply = (input: string, memory: VisitorMemory, messageCount: numbe
     text: addEmojiEveryAlternateBotReply(
       randomPick([
         "I can help with architecture, interiors, renovation planning, design process, budget clarity, timelines, materials, execution support, and how to structure your inquiry. What would you like to explore first?",
-        "Tell me a little about your project and I’ll guide you in a practical way.",
+        "Tell me a little about your project and I'll guide you in a practical way.",
         "Happy to help — are you exploring a new build, interiors, a renovation, or just trying to understand the process?",
       ]),
       messageCount,
@@ -415,7 +387,7 @@ export const ChatWidget = () => {
 
   const timeMeta = useMemo(() => getTimeMeta(), []);
   const initialGreeting = useMemo(() => {
-    return `${timeMeta.greeting} — I’m Suyash, Live agent. ${timeMeta.mood}. I can help with architecture, interiors, renovation planning, timelines, materials, scope clarity, and getting your inquiry ready. 😊`;
+    return `${timeMeta.greeting} — I'm Suyash, Live agent. ${timeMeta.mood}. I can help with architecture, interiors, renovation planning, timelines, materials, scope clarity, and getting your inquiry ready. 😊`;
   }, [timeMeta]);
 
   const [memory, setMemory] = useState<VisitorMemory>({});
@@ -799,13 +771,6 @@ export const ChatWidget = () => {
                           <span>Suyash is typing…</span>
                         </div>
                       </div>
-                    </div>
-                  )}
-
-                  {!typing && Object.keys(memory).length > 0 && (
-                    <div className="rounded-[18px] border border-black/8 bg-surface/70 px-4 py-3 text-[12px] leading-relaxed text-muted-foreground">
-                      <span className="font-medium text-foreground">Saved context:</span>{" "}
-                      {memorySummary(memory)}
                     </div>
                   )}
 
