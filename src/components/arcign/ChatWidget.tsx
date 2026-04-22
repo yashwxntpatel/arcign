@@ -81,7 +81,7 @@ const NON_BUSINESS_REDIRECTS = [
 
 const OFF_TOPIC_KEYWORDS = [
   "joke", "weather", "cricket", "politics", "movie", "song", "recipe",
-  "love", "girlfriend", "boyfriend", "boyfriend", "stock", "crypto", "bitcoin",
+  "love", "girlfriend", "boyfriend", "stock", "crypto", "bitcoin",
   "news", "sport", "football", "ipl", "celebrity", "bollywood", "netflix",
   "meaning of life", "gpt", "chatgpt", "openai", "google", "ai",
   "meme", "game", "gaming", "war", "astrology", "horoscope",
@@ -89,7 +89,6 @@ const OFF_TOPIC_KEYWORDS = [
 
 const isOffTopic = (text: string): boolean => {
   const t = normalize(text);
-  // If it contains any business keyword, it's on-topic
   const businessKeywords = [
     "architecture", "interior", "design", "renovation", "project", "space",
     "room", "apartment", "villa", "house", "office", "consultation", "budget",
@@ -172,7 +171,7 @@ const smartChips = (memory: VisitorMemory): string[] => {
 
 // ─── ARCIGN System Prompt ─────────────────────────────────────────────────────
 
-const ARCIGN_SYSTEM_PROMPT = `You are Suyash, the live support representative for ARCIGN — a premium architecture and interiors studio known for refined, thoughtful design. 
+const ARCIGN_SYSTEM_PROMPT = `You are Suyash, the live support representative for ARCIGN — a premium architecture and interiors studio known for refined, thoughtful design.
 
 Your role: first point of contact for website visitors exploring architecture, interior design, renovation, bespoke joinery, and commercial space projects.
 
@@ -187,9 +186,9 @@ Your core responsibilities:
 6. Keep answers concise — 2–4 sentences max for most replies
 7. Use emojis very sparingly — only when it feels completely natural
 
-If someone asks something completely unrelated to ARCIGN's business (weather, sports, jokes, politics, etc.), respond with a witty, classy one-liner and redirect back to ARCIGN topics. Do NOT answer the off-topic question.
+If someone asks something completely unrelated to ARCIGN's business, respond with a witty, classy one-liner and redirect back to ARCIGN topics.
 
-Never say you are an AI. Never claim to have no knowledge. Respond as Suyash would — a real person who knows ARCIGN deeply.`;
+Never say you are an AI. Respond as Suyash would — a real person who knows ARCIGN deeply.`;
 
 // ─── Fallback Reply Engine ────────────────────────────────────────────────────
 
@@ -201,12 +200,10 @@ const fallbackReply = (
   const t = normalize(input);
   void msgCount;
 
-  // Off-topic
   if (isOffTopic(t)) {
     return { text: pick(NON_BUSINESS_REDIRECTS), chips: smartChips(memory) };
   }
 
-  // Greetings
   const greetWords = ["hi", "hello", "hey", "hii", "yo", "hola", "sup", "good morning", "good afternoon", "good evening", "namaste"];
   if (greetWords.some((g) => t === g || t.startsWith(g + " "))) {
     return {
@@ -219,172 +216,152 @@ const fallbackReply = (
     };
   }
 
-  // Services
   if (has(t, ["services", "what do you do", "offer", "offerings", "work on", "specialize"])) {
     return {
-      text: "ARCIGN works across architecture, interior design, bespoke joinery, material curation, and execution coordination. Each project is handled as a complete design exercise — not just aesthetics. Want me to walk you through any specific area?",
+      text: "ARCIGN works across architecture, interior design, bespoke joinery, material curation, and execution coordination. Each project is treated as a complete design exercise. Want me to walk you through any specific area?",
       chips: ["Architecture", "Interiors", "Joinery & furniture", "Execution support"],
     };
   }
 
-  // Process
   if (has(t, ["process", "how do you work", "how does it work", "workflow", "steps", "how it works", "methodology"])) {
     return {
       text: pick([
         "Every project begins with a discovery session — understanding your goals, lifestyle, site, and budget. From there: concept development, detailed design, material selection, and execution if needed. What stage are you currently at?",
-        "The process typically runs: brief → concept → design development → material curation → execution oversight. The depth varies based on what you need. Tell me about your project and I can map it out for you.",
+        "The process typically runs: brief → concept → design development → material curation → execution oversight. Tell me about your project and I can map it out.",
       ]),
       chips: ["Early planning", "Design stage", "Execution", "Book consultation"],
     };
   }
 
-  // Budget
   if (has(t, ["budget", "cost", "price", "fees", "charges", "how much", "rate", "pricing", "expensive"])) {
     return {
       text: pick([
-        "Costs vary based on project type, area, scope, and finish level. If you share a rough range you're comfortable with, I can give you a much clearer picture of what's achievable.",
+        "Costs vary based on project type, area, scope, and finish level. If you share a rough range, I can give you a clearer picture of what's achievable.",
         "Budget depends on whether it's architecture, interiors, or renovation — and the scale involved. What kind of project are you planning?",
-        `Design fees and execution budgets are two different conversations.${memory.projectType ? ` For a ${memory.projectType} project, let me explain how it typically works.` : " Which are you exploring right now?"}`,
       ]),
       chips: ["Architecture project", "Interior project", "Renovation", "Share project details"],
     };
   }
 
-  // Timeline
   if (has(t, ["timeline", "how long", "duration", "when", "time frame", "how many months", "deadline"])) {
     return {
-      text: `Timelines depend on scope.${memory.projectType === "Architecture" ? " Architecture projects typically run 12–24 months end to end." : memory.projectType === "Interiors" ? " Interior projects range from 3–8 months depending on the rooms in scope." : " Renovations can range from 6 weeks to 6 months based on what's being redone."} What's your target timeline?`,
+      text: `Timelines depend on scope.${memory.projectType === "Architecture" ? " Architecture projects typically run 12–24 months end to end." : memory.projectType === "Interiors" ? " Interior projects range from 3–8 months depending on rooms in scope." : " Renovations can range from 6 weeks to 6 months based on what's being redone."} What's your target timeline?`,
       chips: ["Architecture timeline", "Interior timeline", "Renovation timeline", "Book consultation"],
     };
   }
 
-  // Architecture
   if (has(t, ["architecture", "architect", "new build", "villa design", "house design", "bungalow", "facade", "construction", "structure"])) {
     return {
       text: pick([
-        `For an architecture project, a few things help us scope it properly: site location, approximate built-up area, design direction, and target timeline.${memory.city ? ` Given you're in ${memory.city}, we can factor in local site conditions too.` : " Which city is the site in?"}`,
-        "Architecture work here covers concept design, working drawings, approval drawings, and execution oversight. What kind of property are you building — villa, residence, or something else?",
+        `For an architecture project, a few things help us scope it: site location, approximate built-up area, design direction, and target timeline.${memory.city ? ` Given you're in ${memory.city}, we can factor in local conditions too.` : " Which city is the site in?"}`,
+        "Architecture work covers concept design, working drawings, approval drawings, and execution oversight. What kind of property are you building?",
       ]),
       chips: ["Villa", "Residence", "Site planning", "Facade design"],
     };
   }
 
-  // Interiors
   if (has(t, ["interior", "interiors", "living room", "bedroom", "kitchen", "dining", "apartment", "flat", "furnish", "decor", "room"])) {
     return {
       text: pick([
-        `Interiors work begins with which rooms are in scope, your preferred style direction, and budget range.${memory.propertyType ? ` For your ${memory.propertyType}, that gives us a good starting framework.` : " Is this for an apartment, villa, or another property type?"}`,
-        "For interiors, the key inputs upfront are: rooms in scope, mood you're after, and whether you need design-only or full execution. What does your project look like?",
+        `Interiors work begins with which rooms are in scope, your preferred style direction, and budget range.${memory.propertyType ? ` For your ${memory.propertyType}, that's a solid starting point.` : " Is this for an apartment, villa, or another property?"}`,
+        "Key inputs upfront: rooms in scope, mood you're after, and whether you need design-only or full execution. What does your project look like?",
       ]),
       chips: ["Living room", "Bedroom", "Kitchen", "Full apartment"],
     };
   }
 
-  // Renovation
   if (has(t, ["renovation", "remodel", "redo", "refurbish", "upgrade", "revamp", "gut"])) {
     return {
-      text: "Renovation planning is much cleaner once we're clear on what's changing and what stays. Civil work vs soft upgrades have very different timelines and budgets. What's the scope you're thinking about?",
+      text: "Renovation planning is cleaner once we know what's changing vs what stays. Civil work and soft upgrades have very different timelines and budgets. What's the scope you're thinking about?",
       chips: ["Civil renovation", "Soft upgrade", "Full redo", "Book consultation"],
     };
   }
 
-  // Materials
   if (has(t, ["material", "materials", "finish", "finishes", "stone", "wood", "marble", "tile", "palette", "texture", "granite", "veneer"])) {
     return {
-      text: "Material selection is where a project really comes to life. The key is building a cohesive language — stone, wood, metal, plaster, light — rather than picking individual pieces. Do you have a style direction in mind, or should I help you find one?",
+      text: "Material selection is where a project really comes to life. The key is building a cohesive language — stone, wood, metal, plaster, light — rather than picking individual pieces. Do you have a style direction in mind?",
       chips: ["Warm & earthy", "Stone & wood", "Minimal & light", "Luxury palette"],
     };
   }
 
-  // Furniture / Joinery
   if (has(t, ["furniture", "joinery", "wardrobe", "cabinet", "storage", "tv unit", "bookshelf", "shelf", "built-in", "custom"])) {
     return {
-      text: "Bespoke joinery is a strong part of what ARCIGN does — when furniture is designed alongside the space, the outcome feels significantly more resolved. Are you looking at specific pieces or a full room approach?",
+      text: "Bespoke joinery is a strong part of what ARCIGN does — furniture designed alongside the space feels significantly more resolved. Are you looking at specific pieces or a full room approach?",
       chips: ["Wardrobes", "TV unit", "Kitchen joinery", "Full room joinery"],
     };
   }
 
-  // Style
   if (has(t, ["style", "look", "aesthetic", "mood", "theme", "vibe", "feel", "reference", "inspiration"])) {
     return {
-      text: "Rather than just a style name, think about how you want the space to feel — calm and quiet, warm and tactile, bold and refined, or light and airy. That gives us much stronger design direction. Any words that resonate with you?",
+      text: "Think about how you want the space to feel — calm and quiet, warm and tactile, bold and refined, or light and airy. That gives us stronger design direction than just a style name. Any words that resonate?",
       chips: ["Warm minimal", "Luxury refined", "Clean modern", "Japandi calm"],
     };
   }
 
-  // Execution
   if (has(t, ["execution", "on site", "supervision", "contractor", "implementation", "site management", "vendor"])) {
     return {
-      text: "Execution support means staying involved through site visits, material approvals, and vendor coordination — to protect design intent. Some clients need full oversight, others just milestone reviews. What level of involvement are you thinking?",
+      text: "Execution support means staying involved through site visits, material approvals, and vendor coordination to protect design intent. Some clients need full oversight, others prefer milestone reviews. What are you thinking?",
       chips: ["Full execution", "Milestone reviews", "Design only", "Book consultation"],
     };
   }
 
-  // Location
   if (has(t, ["city", "location", "where", "site", "place", "region", "which city"])) {
     return {
-      text: "Location matters more than people expect — local vendors, site conditions, and approval bodies vary significantly. Which city is your project in?",
+      text: "Location matters more than people expect — local vendors, site conditions, and approval bodies vary. Which city is your project in?",
       chips: ["Bangalore", "Mumbai", "Delhi / Gurgaon", "Other city"],
     };
   }
 
-  // Commercial
-  if (has(t, ["commercial", "office", "workspace", "hospitality", "hotel", "restaurant", "retail", "showroom", "co-working"])) {
+  if (has(t, ["commercial", "office", "workspace", "hospitality", "hotel", "restaurant", "retail", "showroom"])) {
     return {
-      text: "Commercial projects need early clarity around brand expression, functional zoning, footfall, and user experience goals. What type of space is this — office, hospitality, retail, or something else?",
+      text: "Commercial projects need early clarity around brand expression, functional zoning, footfall, and user experience. What type of space is this — office, hospitality, retail?",
       chips: ["Office", "Hospitality", "Retail", "Mixed use"],
     };
   }
 
-  // Approvals
   if (has(t, ["approval", "permission", "sanction", "authority", "municipal", "bmrda", "bbmp", "permit"])) {
     return {
-      text: "Approval requirements depend on city, site type, and the nature of work. Once I know your location and project scope, I can walk you through what typically applies. Where is the site?",
+      text: "Approval requirements depend on city, site type, and scope of work. Once I know your location and project details, I can walk you through what typically applies.",
       chips: ["Share city", "Architecture project", "Book consultation"],
     };
   }
 
-  // Lighting
   if (has(t, ["lighting", "light", "lamps", "fixtures", "ambience", "ambient", "pendant", "cove"])) {
     return {
-      text: "Lighting is one of the most underestimated elements of a space — we treat it as layers. Ambient, task, and accent light all contribute differently to how a room reads at different times. What kind of space is this for?",
+      text: "Lighting defines mood more than most elements — we treat it as layers. Ambient, task, and accent light all read differently at different times of day. What kind of space is this for?",
       chips: ["Living room", "Bedroom", "Kitchen", "Full project"],
     };
   }
 
-  // Checklist / Documents
   if (has(t, ["send", "share", "checklist", "document", "what do you need", "start with", "what to bring"])) {
     return {
-      text: "A useful starting set: project type, city, property type, approximate area, stage you're at, rough budget comfort, and 2–3 reference images if you have them. Even rough inputs work — we refine as we go.",
+      text: "A good starting set: project type, city, property type, approximate area, stage you're at, rough budget range, and 2–3 reference images if you have them. Even rough inputs work — we refine as we go.",
       chips: ["Architecture", "Interiors", "Renovation", "Book consultation"],
     };
   }
 
-  // Start / Begin
   if (has(t, ["start", "begin", "next step", "explore services", "start a project", "get started", "how to start"])) {
     return {
       text: pick([
-        "The best first step is sharing the basics — project type, city, stage, style direction, and a rough budget comfort zone. That's enough for me to guide you properly.",
-        "Let's start with what the project is, where it is, and how far along you are. From there I can point you in the right direction — or connect you with the team directly.",
+        "The best first step is sharing the basics — project type, city, stage, style direction, and a rough budget. That's enough to guide you properly.",
+        "Let's start with what the project is, where it is, and how far along you are. I can point you in the right direction from there.",
       ]),
       chips: ["Architecture", "Interiors", "Renovation", "Book consultation"],
     };
   }
 
-  // Contact / Speak to team
   if (has(t, ["speak", "talk", "contact", "reach", "connect", "call me", "get in touch", "whatsapp", "phone", "email", "team"])) {
     return {
-      text: "Happy to connect you with the ARCIGN team. I can note down your details and have someone reach out — usually within a few hours. Want to go ahead?",
+      text: "Happy to connect you with the ARCIGN team. I can note your details and have someone reach out — usually within a few hours. Want to go ahead?",
       chips: ["Yes, connect me", "Book consultation", "Tell me more first"],
     };
   }
 
-  // Default
   return {
     text: pick([
       "Tell me a bit more about the project — I'll guide you from there.",
       "Happy to help — is this about architecture, interiors, or a renovation?",
-      `I can help with scope, timelines, budget direction, materials, or booking a consultation.${memory.name ? ` What would be most useful right now, ${memory.name}?` : " What would be most useful right now?"}`,
+      `I can help with scope, timelines, budget direction, materials, or booking a consultation.${memory.name ? ` What would be most useful right now, ${memory.name}?` : " What would be most useful?"}`,
     ]),
     chips: smartChips(memory),
   };
@@ -392,22 +369,35 @@ const fallbackReply = (
 
 // ─── Typing Delay ─────────────────────────────────────────────────────────────
 
-const typingDelay = (text: string): number => {
-  const base = 650;
-  const perChar = 14;
-  const max = 2200;
-  return Math.min(base + text.length * perChar, max);
+const typingDelay = (text: string): number =>
+  Math.min(650 + text.length * 14, 2200);
+
+// ─── Glass Tokens ─────────────────────────────────────────────────────────────
+
+const G = {
+  panel:      "rgba(255,255,255,0.52)",
+  header:     "rgba(255,255,255,0.42)",
+  msgArea:    "rgba(255,255,255,0.20)",
+  botBubble:  "rgba(255,255,255,0.75)",
+  userBubble: "rgba(0,0,0,0.055)",
+  chipBg:     "rgba(255,255,255,0.58)",
+  inputBg:    "rgba(255,255,255,0.62)",
+  footerBg:   "rgba(255,255,255,0.36)",
+  border:     "rgba(0,0,0,0.08)",
+  blur:       "blur(22px)",
+  panelShadow:"0 24px 80px rgba(0,0,0,0.13), 0 2px 12px rgba(0,0,0,0.07), inset 0 1px 0 rgba(255,255,255,0.72)",
+  launchShadow:"0 8px 32px rgba(0,0,0,0.14), 0 2px 8px rgba(0,0,0,0.07), inset 0 1px 0 rgba(255,255,255,0.65)",
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export const ChatWidget = () => {
-  const [visible, setVisible] = useState(false);
-  const [open, setOpen] = useState(false);
-  const [input, setInput] = useState("");
-  const [typing, setTyping] = useState(false);
+  const [visible, setVisible]         = useState(false);
+  const [open, setOpen]               = useState(false);
+  const [input, setInput]             = useState("");
+  const [typing, setTyping]           = useState(false);
   const [consultStage, setConsultStage] = useState<ConsultationStage>("idle");
-  const [memory, setMemory] = useState<VisitorMemory>({});
+  const [memory, setMemory]           = useState<VisitorMemory>({});
   const [unreadCount, setUnreadCount] = useState(0);
 
   const timeMeta = useMemo(() => getTimeMeta(), []);
@@ -428,257 +418,143 @@ export const ChatWidget = () => {
   );
 
   const [messages, setMessages] = useState<Message[]>([initialMessage]);
-  const endRef = useRef<HTMLDivElement>(null);
+  const endRef   = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // ── Restore from localStorage ──────────────────────────────────────────────
-
+  // Restore
   useEffect(() => {
     try {
-      const msgs = localStorage.getItem(CHAT_KEY);
-      const mem = localStorage.getItem(MEMORY_KEY);
+      const msgs  = localStorage.getItem(CHAT_KEY);
+      const mem   = localStorage.getItem(MEMORY_KEY);
       const stage = localStorage.getItem(CONSULT_KEY);
-
-      if (msgs) {
-        const parsed = JSON.parse(msgs) as Message[];
-        if (Array.isArray(parsed) && parsed.length > 0) setMessages(parsed);
-      }
-      if (mem) {
-        const parsedMem = JSON.parse(mem) as VisitorMemory;
-        if (parsedMem && typeof parsedMem === "object") setMemory(parsedMem);
-      }
-      if (stage && ["idle", "ask_name", "ask_phone", "done"].includes(stage)) {
-        setConsultStage(stage as ConsultationStage);
-      }
+      if (msgs)  { const p = JSON.parse(msgs)  as Message[];      if (Array.isArray(p) && p.length) setMessages(p); }
+      if (mem)   { const p = JSON.parse(mem)   as VisitorMemory;  if (p && typeof p === "object")  setMemory(p); }
+      if (stage && ["idle","ask_name","ask_phone","done"].includes(stage)) setConsultStage(stage as ConsultationStage);
     } catch { /* ignore */ }
   }, []);
 
-  // ── Persist ────────────────────────────────────────────────────────────────
+  useEffect(() => { try { localStorage.setItem(CHAT_KEY,    JSON.stringify(messages));  } catch { /* ignore */ } }, [messages]);
+  useEffect(() => { try { localStorage.setItem(MEMORY_KEY,  JSON.stringify(memory));    } catch { /* ignore */ } }, [memory]);
+  useEffect(() => { try { localStorage.setItem(CONSULT_KEY, consultStage);              } catch { /* ignore */ } }, [consultStage]);
 
   useEffect(() => {
-    try { localStorage.setItem(CHAT_KEY, JSON.stringify(messages)); } catch { /* ignore */ }
-  }, [messages]);
-
-  useEffect(() => {
-    try { localStorage.setItem(MEMORY_KEY, JSON.stringify(memory)); } catch { /* ignore */ }
-  }, [memory]);
-
-  useEffect(() => {
-    try { localStorage.setItem(CONSULT_KEY, consultStage); } catch { /* ignore */ }
-  }, [consultStage]);
-
-  // ── Scroll trigger ─────────────────────────────────────────────────────────
-
-  useEffect(() => {
-    const onScroll = () => setVisible(window.scrollY > window.innerHeight * 0.6);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    const fn = () => setVisible(window.scrollY > window.innerHeight * 0.6);
+    fn(); window.addEventListener("scroll", fn, { passive: true });
+    return () => window.removeEventListener("scroll", fn);
   }, []);
 
-  // ── Auto-scroll ────────────────────────────────────────────────────────────
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, typing, open]);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, typing, open]);
-
-  // ── Focus on open ──────────────────────────────────────────────────────────
-
-  useEffect(() => {
-    if (open) {
-      setTimeout(() => inputRef.current?.focus(), 350);
-      setUnreadCount(0);
-    }
+    if (open) { setTimeout(() => inputRef.current?.focus(), 350); setUnreadCount(0); }
   }, [open]);
 
-  // ── Unread badge ───────────────────────────────────────────────────────────
-
   useEffect(() => {
-    if (!open && messages.length > 1) {
-      const lastMsg = messages[messages.length - 1];
-      if (lastMsg.sender === "bot") setUnreadCount((c) => Math.min(c + 1, 9));
-    }
+    if (!open && messages.length > 1 && messages[messages.length - 1].sender === "bot")
+      setUnreadCount((c) => Math.min(c + 1, 9));
   }, [messages, open]);
 
-  // ── Add bot message ────────────────────────────────────────────────────────
-
   const addBot = useCallback((text: string, chips?: string[]) => {
-    setMessages((prev) => [
-      ...prev,
-      { id: `b-${uid()}`, sender: "bot", text, chips, time: getTimeStr() },
-    ]);
+    setMessages((p) => [...p, { id: `b-${uid()}`, sender: "bot", text, chips, time: getTimeStr() }]);
   }, []);
 
-  // ── API with fallback ──────────────────────────────────────────────────────
+  const getBotReply = useCallback(async (
+    text: string, mem: VisitorMemory, history: Message[]
+  ): Promise<{ text: string; chips?: string[] }> => {
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text, agentName: "Suyash", company: "ARCIGN",
+          role: "Live support agent", timeOfDay: timeMeta.greeting,
+          visitorMemory: mem, recentMessages: history.slice(-10),
+          systemPrompt: ARCIGN_SYSTEM_PROMPT }),
+      });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      if (data?.reply && typeof data.reply === "string")
+        return { text: data.reply, chips: Array.isArray(data.chips) ? data.chips : smartChips(mem) };
+      throw new Error();
+    } catch { return fallbackReply(text, mem, history.length); }
+  }, [timeMeta]);
 
-  const getBotReply = useCallback(
-    async (
-      text: string,
-      mem: VisitorMemory,
-      history: Message[]
-    ): Promise<{ text: string; chips?: string[] }> => {
-      try {
-        const res = await fetch("/api/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            message: text,
-            agentName: "Suyash",
-            company: "ARCIGN",
-            role: "Live support agent",
-            timeOfDay: timeMeta.greeting,
-            visitorMemory: mem,
-            recentMessages: history.slice(-10),
-            systemPrompt: ARCIGN_SYSTEM_PROMPT,
-          }),
-        });
-        if (!res.ok) throw new Error("unavailable");
-        const data = await res.json();
-        if (data?.reply && typeof data.reply === "string") {
-          return {
-            text: data.reply,
-            chips: Array.isArray(data.chips) ? data.chips : smartChips(mem),
-          };
-        }
-        throw new Error("bad response");
-      } catch {
-        return fallbackReply(text, mem, history.length);
-      }
-    },
-    [timeMeta]
-  );
+  const sendMessage = useCallback(async (rawText: string) => {
+    const text = rawText.trim();
+    if (!text || typing) return;
 
-  // ── Send message ───────────────────────────────────────────────────────────
+    const updatedMemory = extractMemory(text, memory);
+    setMemory(updatedMemory);
+    const userMsg: Message = { id: `u-${uid()}`, sender: "user", text, time: getTimeStr() };
+    const nextHistory = [...messages, userMsg];
+    setMessages(nextHistory);
+    setInput("");
 
-  const sendMessage = useCallback(
-    async (rawText: string) => {
-      const text = rawText.trim();
-      if (!text || typing) return;
-
-      const updatedMemory = extractMemory(text, memory);
-      setMemory(updatedMemory);
-
-      const userMsg: Message = { id: `u-${uid()}`, sender: "user", text, time: getTimeStr() };
-      const nextHistory = [...messages, userMsg];
-      setMessages(nextHistory);
-      setInput("");
-
-      // ── Consultation flow ──
-      if (consultStage === "ask_name") {
-        const name = extractName(text) ?? text.trim();
-        setMemory((m) => ({ ...m, name }));
-        setConsultStage("ask_phone");
-        setTyping(true);
-        setTimeout(() => {
-          addBot(
-            `Thank you${name ? `, ${name}` : ""}. Could you share your WhatsApp or phone number so the team can reach out?`
-          );
-          setTyping(false);
-        }, 700);
-        return;
-      }
-
-      if (consultStage === "ask_phone") {
-        if (!isValidPhone(text)) {
-          setTyping(true);
-          setTimeout(() => {
-            addBot("Could you double-check that number? I want to make sure it reaches you correctly.");
-            setTyping(false);
-          }, 650);
-          return;
-        }
-        const phone = cleanPhone(text);
-        setMemory((m) => ({ ...m, phone }));
-        setConsultStage("done");
-        setTyping(true);
-        setTimeout(() => {
-          addBot(
-            `Perfect${memory.name ? `, ${memory.name}` : ""}. Your details are noted. The ARCIGN team will be in touch shortly — looking forward to learning more about your project.`
-          );
-          setTyping(false);
-        }, 750);
-        return;
-      }
-
-      // ── Consultation trigger ──
-      const consultTriggers = [
-        "book consultation", "consultation", "book a call", "schedule",
-        "book meeting", "start consultation", "book call", "speak to team",
-        "get in touch", "contact me", "can someone call", "want to connect",
-        "yes, connect me", "connect me",
-      ];
-      if (has(normalize(text), consultTriggers)) {
-        setConsultStage("ask_name");
-        setTyping(true);
-        setTimeout(() => {
-          addBot("Absolutely — I can help with that. May I have your name first?");
-          setTyping(false);
-        }, 650);
-        return;
-      }
-
-      // ── Normal reply ──
+    if (consultStage === "ask_name") {
+      const name = extractName(text) ?? text.trim();
+      setMemory((m) => ({ ...m, name }));
+      setConsultStage("ask_phone");
       setTyping(true);
-      const reply = await getBotReply(text, updatedMemory, nextHistory);
-      setTimeout(() => {
-        addBot(reply.text, reply.chips);
-        setTyping(false);
-      }, typingDelay(reply.text));
-    },
-    [typing, memory, messages, consultStage, addBot, getBotReply]
-  );
+      setTimeout(() => { addBot(`Thank you${name ? `, ${name}` : ""}. Could you share your WhatsApp or phone number so the team can reach out?`); setTyping(false); }, 700);
+      return;
+    }
 
-  // ── Reset ──────────────────────────────────────────────────────────────────
+    if (consultStage === "ask_phone") {
+      if (!isValidPhone(text)) {
+        setTyping(true);
+        setTimeout(() => { addBot("Could you double-check that number? I want to make sure it reaches you correctly."); setTyping(false); }, 650);
+        return;
+      }
+      setMemory((m) => ({ ...m, phone: cleanPhone(text) }));
+      setConsultStage("done");
+      setTyping(true);
+      setTimeout(() => { addBot(`Perfect${memory.name ? `, ${memory.name}` : ""}. Your details are noted. The ARCIGN team will be in touch shortly — looking forward to learning more about your project.`); setTyping(false); }, 750);
+      return;
+    }
+
+    const consultTriggers = ["book consultation","consultation","book a call","schedule","book meeting",
+      "start consultation","book call","speak to team","get in touch","contact me",
+      "can someone call","want to connect","yes, connect me","connect me"];
+    if (has(normalize(text), consultTriggers)) {
+      setConsultStage("ask_name");
+      setTyping(true);
+      setTimeout(() => { addBot("Absolutely — I can help with that. May I have your name first?"); setTyping(false); }, 650);
+      return;
+    }
+
+    setTyping(true);
+    const reply = await getBotReply(text, updatedMemory, nextHistory);
+    setTimeout(() => { addBot(reply.text, reply.chips); setTyping(false); }, typingDelay(reply.text));
+  }, [typing, memory, messages, consultStage, addBot, getBotReply]);
 
   const reset = useCallback(() => {
-    setMessages([initialMessage]);
-    setMemory({});
-    setConsultStage("idle");
-    setUnreadCount(0);
-    try {
-      localStorage.removeItem(CHAT_KEY);
-      localStorage.removeItem(MEMORY_KEY);
-      localStorage.removeItem(CONSULT_KEY);
-    } catch { /* ignore */ }
+    setMessages([initialMessage]); setMemory({}); setConsultStage("idle"); setUnreadCount(0);
+    try { [CHAT_KEY, MEMORY_KEY, CONSULT_KEY].forEach((k) => localStorage.removeItem(k)); } catch { /* ignore */ }
   }, [initialMessage]);
 
   // ─── Render ────────────────────────────────────────────────────────────────
+
+  const iconBtn: React.CSSProperties = {
+    background: "rgba(0,0,0,0.04)",
+    border: `1px solid ${G.border}`,
+    borderRadius: 8, width: 33, height: 33,
+    display: "flex", alignItems: "center", justifyContent: "center",
+    color: "rgba(0,0,0,0.45)", cursor: "pointer", transition: "background 0.15s",
+    flexShrink: 0,
+  };
 
   return (
     <>
       <style>{`
         @keyframes arcignDot {
-          0%, 60%, 100% { transform: translateY(0); opacity: 0.3; }
-          30% { transform: translateY(-4px); opacity: 1; }
+          0%,60%,100% { transform:translateY(0); opacity:0.28; }
+          30%          { transform:translateY(-4px); opacity:1; }
         }
-        @keyframes arcignPulse {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.4); }
-          50% { box-shadow: 0 0 0 6px rgba(52, 211, 153, 0); }
-        }
-        .arcign-scroll::-webkit-scrollbar { width: 0; }
-        .arcign-chips::-webkit-scrollbar { height: 0; }
-        .arcign-msg-bubble { word-break: break-word; }
-        .arcign-chat-bg {
-          background-color: #ece5dd;
-          background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23c5b8ad' fill-opacity='0.18'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-        }
-        .arcign-input-bar {
-          background: #ffffff;
-          border-radius: 24px;
-        }
-        .arcign-send-btn {
-          background: #25a560;
-          border-radius: 50%;
-          width: 40px;
-          height: 40px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          transition: background 0.2s;
-          flex-shrink: 0;
-        }
-        .arcign-send-btn:hover { background: #1e9452; }
-        .arcign-send-btn:disabled { background: #b2dfcb; cursor: not-allowed; }
+        .arcign-scroll::-webkit-scrollbar { width:0; }
+        .arcign-chips::-webkit-scrollbar  { height:0; }
+        .arcign-msg-bubble { word-break:break-word; }
+        .ag-chip:hover    { background:rgba(0,0,0,0.07)!important; border-color:rgba(0,0,0,0.16)!important; }
+        .ag-icon:hover    { background:rgba(0,0,0,0.07)!important; }
+        .ag-send:hover:not(:disabled) { background:rgba(0,0,0,0.88)!important; }
+        .ag-launch:hover  { transform:scale(1.025); box-shadow:0 12px 40px rgba(0,0,0,0.18)!important; }
       `}</style>
 
       <AnimatePresence>
@@ -695,61 +571,46 @@ export const ChatWidget = () => {
                 exit={{ opacity: 0, y: 24, scale: 0.88 }}
                 transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
                 aria-label="Open chat with Suyash"
-                className="fixed bottom-6 right-6 z-[70] flex items-center gap-3 md:bottom-8 md:right-8"
+                className="ag-launch"
                 style={{
-                  background: "linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)",
-                  borderRadius: 60,
-                  padding: "10px 20px 10px 10px",
-                  boxShadow: "0 8px 32px rgba(0,0,0,0.28), 0 2px 8px rgba(0,0,0,0.18)",
-                  border: "1px solid rgba(255,255,255,0.08)",
+                  position: "fixed", bottom: 24, right: 24, zIndex: 70,
+                  display: "flex", alignItems: "center", gap: 12,
+                  background: G.panel,
+                  backdropFilter: G.blur, WebkitBackdropFilter: G.blur,
+                  border: `1px solid ${G.border}`,
+                  borderRadius: 60, padding: "10px 20px 10px 10px",
+                  boxShadow: G.launchShadow,
+                  cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s",
                 }}
               >
-                {/* Avatar + online dot */}
-                <span className="relative shrink-0">
-                  <span
-                    className="block overflow-hidden"
-                    style={{ width: 44, height: 44, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.12)" }}
-                  >
-                    <img src={suyashPhoto} alt="Suyash" className="h-full w-full object-cover" />
+                <span style={{ position: "relative", flexShrink: 0 }}>
+                  <span style={{ display: "block", width: 44, height: 44, borderRadius: "50%", overflow: "hidden", border: "1.5px solid rgba(0,0,0,0.10)" }}>
+                    <img src={suyashPhoto} alt="Suyash" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                   </span>
-                  <span
-                    className="absolute"
-                    style={{
-                      bottom: 1, right: 1, width: 13, height: 13,
-                      background: "#25d366", borderRadius: "50%",
-                      border: "2px solid #1a1a1a",
-                      animation: "arcignPulse 2s ease-in-out infinite",
-                    }}
-                  />
+                  <span style={{ position: "absolute", bottom: 1, right: 1, width: 12, height: 12, background: "#22c55e", borderRadius: "50%", border: "2px solid rgba(255,255,255,0.85)" }} />
                 </span>
 
-                {/* Text */}
-                <span className="hidden flex-col text-left sm:flex">
-                  <span style={{ fontSize: 10, letterSpacing: "0.22em", color: "rgba(255,255,255,0.45)", textTransform: "uppercase", lineHeight: 1, marginBottom: 3 }}>
+                <span style={{ display: "flex", flexDirection: "column", textAlign: "left" }}>
+                  <span style={{ fontSize: 10, letterSpacing: "0.22em", color: "rgba(0,0,0,0.38)", textTransform: "uppercase", lineHeight: 1, marginBottom: 3 }}>
                     ARCIGN Support
                   </span>
-                  <span style={{ fontSize: 13.5, fontWeight: 500, color: "#fff", lineHeight: 1.2 }}>
+                  <span style={{ fontSize: 13.5, fontWeight: 600, color: "#0a0a0a", lineHeight: 1.2 }}>
                     Suyash · Online
                   </span>
                 </span>
 
-                {/* Unread badge */}
                 {unreadCount > 0 && (
                   <motion.span
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    exit={{ scale: 0 }}
+                    initial={{ scale: 0 }} animate={{ scale: 1 }}
                     style={{
                       position: "absolute", top: -4, right: -4,
                       background: "#ef4444", color: "#fff",
                       borderRadius: "50%", width: 18, height: 18,
-                      fontSize: 10, fontWeight: 700, display: "flex",
-                      alignItems: "center", justifyContent: "center",
-                      border: "2px solid #1a1a1a",
+                      fontSize: 10, fontWeight: 700,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      border: "2px solid rgba(255,255,255,0.85)",
                     }}
-                  >
-                    {unreadCount}
-                  </motion.span>
+                  >{unreadCount}</motion.span>
                 )}
               </motion.button>
             )}
@@ -762,135 +623,72 @@ export const ChatWidget = () => {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 32, scale: 0.93 }}
                 transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
-                className="fixed bottom-6 right-6 z-[80] flex flex-col overflow-hidden md:bottom-8 md:right-8"
                 style={{
+                  position: "fixed", bottom: 24, right: 24, zIndex: 80,
                   width: "min(400px, calc(100vw - 20px))",
                   maxHeight: "min(680px, calc(100svh - 32px))",
-                  borderRadius: 18,
-                  boxShadow: "0 24px 80px rgba(0,0,0,0.22), 0 4px 16px rgba(0,0,0,0.12)",
-                  overflow: "hidden",
-                  display: "flex",
-                  flexDirection: "column",
+                  display: "flex", flexDirection: "column",
+                  borderRadius: 20, overflow: "hidden",
+                  background: G.panel,
+                  backdropFilter: G.blur, WebkitBackdropFilter: G.blur,
+                  border: `1px solid ${G.border}`,
+                  boxShadow: G.panelShadow,
                 }}
               >
 
-                {/* ── WhatsApp-style Header ── */}
-                <div
-                  style={{
-                    background: "linear-gradient(135deg, #1a1a1a 0%, #222 100%)",
-                    padding: "12px 14px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 12,
-                    flexShrink: 0,
-                    borderBottom: "1px solid rgba(255,255,255,0.06)",
-                  }}
-                >
-                  {/* Back / close on mobile */}
-                  <button
-                    type="button"
-                    onClick={() => setOpen(false)}
-                    style={{
-                      background: "none", border: "none", cursor: "pointer",
-                      color: "rgba(255,255,255,0.65)", padding: 4, display: "flex",
-                      alignItems: "center", borderRadius: 6,
-                    }}
-                    aria-label="Close"
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="15 18 9 12 15 6" />
-                    </svg>
+                {/* Header */}
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 10,
+                  padding: "13px 14px",
+                  background: G.header,
+                  backdropFilter: "blur(24px)", WebkitBackdropFilter: "blur(24px)",
+                  borderBottom: `1px solid ${G.border}`, flexShrink: 0,
+                }}>
+                  <button type="button" onClick={() => setOpen(false)} className="ag-icon"
+                    style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(0,0,0,0.4)", padding: 4, display: "flex", alignItems: "center", borderRadius: 6, transition: "background 0.15s" }}
+                    aria-label="Close">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
                   </button>
 
-                  {/* Avatar */}
-                  <div className="relative shrink-0">
-                    <div
-                      style={{
-                        width: 40, height: 40, borderRadius: "50%",
-                        overflow: "hidden", border: "1.5px solid rgba(255,255,255,0.15)",
-                      }}
-                    >
-                      <img src={suyashPhoto} alt="Suyash" className="h-full w-full object-cover" />
+                  <div style={{ position: "relative", flexShrink: 0 }}>
+                    <div style={{ width: 40, height: 40, borderRadius: "50%", overflow: "hidden", border: "1.5px solid rgba(0,0,0,0.10)" }}>
+                      <img src={suyashPhoto} alt="Suyash" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                     </div>
-                    <span
-                      style={{
-                        position: "absolute", bottom: 0, right: 0,
-                        width: 11, height: 11, background: "#25d366",
-                        borderRadius: "50%", border: "2px solid #1a1a1a",
-                      }}
-                    />
+                    <span style={{ position: "absolute", bottom: 0, right: 0, width: 11, height: 11, background: "#22c55e", borderRadius: "50%", border: "2px solid rgba(255,255,255,0.85)" }} />
                   </div>
 
-                  {/* Name + status */}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 15, fontWeight: 600, color: "#fff", lineHeight: 1.2, letterSpacing: "-0.01em" }}>
-                      Suyash
-                    </div>
-                    <div style={{ fontSize: 11.5, color: "#25d366", marginTop: 2, lineHeight: 1 }}>
-                      Online · ARCIGN Support
-                    </div>
+                    <div style={{ fontSize: 14.5, fontWeight: 600, color: "#0a0a0a", lineHeight: 1.2 }}>Suyash</div>
+                    <div style={{ fontSize: 11, color: "#16a34a", marginTop: 2 }}>Online · ARCIGN Support</div>
                   </div>
 
-                  {/* Actions */}
                   <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                    <a
-                      href="tel:+919999999999"
-                      style={{
-                        background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.1)",
-                        borderRadius: 8, width: 34, height: 34, display: "flex",
-                        alignItems: "center", justifyContent: "center",
-                        color: "rgba(255,255,255,0.65)", textDecoration: "none",
-                        transition: "all 0.18s",
-                      }}
-                      aria-label="Call"
-                      title="Call ARCIGN"
-                    >
-                      <Phone size={14} />
+                    <a href="tel:+919999999999" className="ag-icon" style={{ ...iconBtn, textDecoration: "none" }} aria-label="Call">
+                      <Phone size={13} />
                     </a>
-                    <button
-                      type="button"
-                      onClick={reset}
-                      style={{
-                        background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.1)",
-                        borderRadius: 8, width: 34, height: 34, display: "flex",
-                        alignItems: "center", justifyContent: "center",
-                        color: "rgba(255,255,255,0.65)", cursor: "pointer",
-                        transition: "all 0.18s",
-                      }}
-                      aria-label="Reset chat"
-                      title="Reset conversation"
-                    >
-                      <RotateCcw size={13} />
+                    <button type="button" onClick={reset} className="ag-icon" style={iconBtn} aria-label="Reset">
+                      <RotateCcw size={12} />
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setOpen(false)}
-                      style={{
-                        background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.1)",
-                        borderRadius: 8, width: 34, height: 34, display: "flex",
-                        alignItems: "center", justifyContent: "center",
-                        color: "rgba(255,255,255,0.65)", cursor: "pointer",
-                        transition: "all 0.18s",
-                      }}
-                      aria-label="Close chat"
-                    >
-                      <X size={14} />
+                    <button type="button" onClick={() => setOpen(false)} className="ag-icon" style={iconBtn} aria-label="Close">
+                      <X size={13} />
                     </button>
                   </div>
                 </div>
 
-                {/* ── Messages Area (WhatsApp chat bg) ── */}
-                <div
-                  className="arcign-scroll arcign-chat-bg flex-1 overflow-y-auto overscroll-contain"
-                  style={{ padding: "16px 12px 8px" }}
-                >
-                  {/* Date chip */}
-                  <div style={{ textAlign: "center", marginBottom: 12 }}>
+                {/* Messages */}
+                <div className="arcign-scroll" style={{
+                  flex: 1, overflowY: "auto", overscrollBehavior: "contain",
+                  padding: "16px 12px 8px",
+                  background: G.msgArea,
+                  backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
+                }}>
+                  {/* Date pill */}
+                  <div style={{ textAlign: "center", marginBottom: 14 }}>
                     <span style={{
-                      background: "rgba(255,255,255,0.72)", backdropFilter: "blur(8px)",
-                      borderRadius: 6, padding: "3px 10px",
-                      fontSize: 11, color: "#5a5a5a", fontWeight: 500,
-                      boxShadow: "0 1px 2px rgba(0,0,0,0.08)",
+                      background: "rgba(255,255,255,0.55)", backdropFilter: "blur(8px)",
+                      borderRadius: 6, padding: "3px 12px",
+                      fontSize: 10.5, color: "rgba(0,0,0,0.40)", fontWeight: 500,
+                      border: `1px solid ${G.border}`,
                     }}>
                       {new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" })}
                     </span>
@@ -905,101 +703,69 @@ export const ChatWidget = () => {
                       return (
                         <motion.div
                           key={msg.id}
-                          initial={{ opacity: 0, y: 10, scale: 0.96 }}
+                          className="arcign-msg-bubble"
+                          initial={{ opacity: 0, y: 10, scale: 0.97 }}
                           animate={{ opacity: 1, y: 0, scale: 1 }}
-                          transition={{ duration: 0.25, delay: i === 0 ? 0 : 0.04 }}
+                          transition={{ duration: 0.24, delay: i === 0 ? 0 : 0.04 }}
                         >
-                          <div
-                            className="arcign-msg-bubble"
-                            style={{
-                              display: "flex",
-                              flexDirection: isBot ? "row" : "row-reverse",
-                              alignItems: "flex-end",
-                              gap: 6,
-                              marginBottom: 1,
-                            }}
-                          >
-                            {/* Avatar for bot */}
+                          <div style={{ display: "flex", flexDirection: isBot ? "row" : "row-reverse", alignItems: "flex-end", gap: 6 }}>
                             {isBot ? (
                               <div style={{ width: 28, flexShrink: 0 }}>
                                 {showAvatar && (
-                                  <div style={{ width: 28, height: 28, borderRadius: "50%", overflow: "hidden", border: "1.5px solid rgba(0,0,0,0.08)" }}>
+                                  <div style={{ width: 28, height: 28, borderRadius: "50%", overflow: "hidden", border: "1px solid rgba(0,0,0,0.08)" }}>
                                     <img src={suyashPhoto} alt="Suyash" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                                   </div>
                                 )}
                               </div>
                             ) : <div style={{ width: 0 }} />}
 
-                            {/* Bubble */}
-                            <div
-                              style={{
-                                maxWidth: "78%",
-                                background: isBot ? "#ffffff" : "#dcf8c6",
-                                borderRadius: isBot
-                                  ? (showAvatar ? "0px 14px 14px 14px" : "14px 14px 14px 4px")
-                                  : "14px 14px 4px 14px",
-                                padding: "9px 13px 7px",
-                                boxShadow: "0 1px 3px rgba(0,0,0,0.10)",
-                                position: "relative",
-                              }}
-                            >
-                              {/* Bot name label */}
+                            <div style={{
+                              maxWidth: "78%",
+                              background: isBot ? G.botBubble : G.userBubble,
+                              backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)",
+                              border: `1px solid ${isBot ? "rgba(0,0,0,0.07)" : "rgba(0,0,0,0.08)"}`,
+                              borderRadius: isBot
+                                ? (showAvatar ? "2px 16px 16px 16px" : "16px 16px 16px 4px")
+                                : "16px 16px 4px 16px",
+                              padding: "9px 13px 7px",
+                              boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+                            }}>
                               {isBot && showAvatar && (
-                                <div style={{ fontSize: 11, fontWeight: 700, color: "#075e54", marginBottom: 3, letterSpacing: "0.01em" }}>
+                                <div style={{ fontSize: 10.5, fontWeight: 700, color: "#15803d", marginBottom: 4 }}>
                                   Suyash · ARCIGN
                                 </div>
                               )}
-                              <p style={{ fontSize: 13.5, lineHeight: 1.58, color: "#1a1a1a", margin: 0 }}>
-                                {msg.text}
-                              </p>
-                              {/* Timestamp */}
+                              <p style={{ fontSize: 13.5, lineHeight: 1.58, color: "#0a0a0a", margin: 0 }}>{msg.text}</p>
                               <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 4, gap: 4, alignItems: "center" }}>
-                                <span style={{ fontSize: 10.5, color: "#9aa3af" }}>{msg.time ?? ""}</span>
+                                <span style={{ fontSize: 10, color: "rgba(0,0,0,0.32)" }}>{msg.time ?? ""}</span>
                                 {!isBot && (
-                                  <svg width="14" height="10" viewBox="0 0 16 11" fill="none">
-                                    <path d="M1 6L5 10L15 1" stroke="#53bdeb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                    <path d="M5 6L9 10L15 5" stroke="#53bdeb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.5" />
+                                  <svg width="14" height="9" viewBox="0 0 16 11" fill="none">
+                                    <path d="M1 6L5 10L15 1" stroke="rgba(0,0,0,0.3)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                                    <path d="M5 6L9 10L15 5" stroke="rgba(0,0,0,0.18)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                                   </svg>
                                 )}
                               </div>
                             </div>
                           </div>
 
-                          {/* Chips */}
                           {isBot && msg.chips && msg.chips.length > 0 && (
                             <motion.div
-                              initial={{ opacity: 0, y: 5 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              transition={{ delay: 0.15, duration: 0.24 }}
-                              style={{
-                                display: "flex", flexWrap: "wrap", gap: 7,
-                                marginTop: 8, marginLeft: 34, marginBottom: 6,
-                              }}
+                              initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: 0.15, duration: 0.22 }}
+                              style={{ display: "flex", flexWrap: "wrap", gap: 7, marginTop: 8, marginLeft: 34, marginBottom: 6 }}
                             >
                               {msg.chips.map((chip) => (
-                                <button
-                                  key={chip}
-                                  type="button"
-                                  onClick={() => void sendMessage(chip)}
+                                <button key={chip} type="button" onClick={() => void sendMessage(chip)}
+                                  className="ag-chip"
                                   style={{
-                                    background: "#fff", border: "1.5px solid #d1d5db",
+                                    background: G.chipBg,
+                                    backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)",
+                                    border: `1px solid rgba(0,0,0,0.09)`,
                                     borderRadius: 20, padding: "6px 14px",
-                                    fontSize: 12, color: "#075e54", fontWeight: 500,
+                                    fontSize: 12, color: "#0a0a0a", fontWeight: 500,
                                     cursor: "pointer", transition: "all 0.15s",
-                                    boxShadow: "0 1px 3px rgba(0,0,0,0.07)",
-                                    lineHeight: 1,
-                                  }}
-                                  onMouseEnter={(e) => {
-                                    (e.currentTarget as HTMLButtonElement).style.background = "#075e54";
-                                    (e.currentTarget as HTMLButtonElement).style.color = "#fff";
-                                    (e.currentTarget as HTMLButtonElement).style.borderColor = "#075e54";
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    (e.currentTarget as HTMLButtonElement).style.background = "#fff";
-                                    (e.currentTarget as HTMLButtonElement).style.color = "#075e54";
-                                    (e.currentTarget as HTMLButtonElement).style.borderColor = "#d1d5db";
-                                  }}
-                                >
+                                    boxShadow: "0 1px 3px rgba(0,0,0,0.05)", lineHeight: 1,
+                                  }}>
                                   {chip}
                                 </button>
                               ))}
@@ -1009,35 +775,28 @@ export const ChatWidget = () => {
                       );
                     })}
 
-                    {/* Typing indicator */}
                     <AnimatePresence>
                       {typing && (
                         <motion.div
-                          initial={{ opacity: 0, y: 8, scale: 0.95 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: 4 }}
-                          transition={{ duration: 0.2 }}
+                          initial={{ opacity: 0, y: 8, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 4 }} transition={{ duration: 0.2 }}
                           style={{ display: "flex", alignItems: "flex-end", gap: 6, marginTop: 2 }}
                         >
-                          <div style={{ width: 28, height: 28, borderRadius: "50%", overflow: "hidden", flexShrink: 0, border: "1.5px solid rgba(0,0,0,0.08)" }}>
+                          <div style={{ width: 28, height: 28, borderRadius: "50%", overflow: "hidden", flexShrink: 0, border: "1px solid rgba(0,0,0,0.08)" }}>
                             <img src={suyashPhoto} alt="Suyash" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                           </div>
-                          <div
-                            style={{
-                              background: "#fff", borderRadius: "0px 14px 14px 14px",
-                              padding: "11px 16px", display: "flex", gap: 5,
-                              alignItems: "center", boxShadow: "0 1px 3px rgba(0,0,0,0.10)",
-                            }}
-                          >
-                            {[0, 1, 2].map((i) => (
-                              <span
-                                key={i}
-                                style={{
-                                  width: 7, height: 7, borderRadius: "50%",
-                                  background: "#a0a0a0", display: "block",
-                                  animation: `arcignDot 1.3s ease-in-out ${i * 0.2}s infinite`,
-                                }}
-                              />
+                          <div style={{
+                            background: G.botBubble, backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)",
+                            border: `1px solid rgba(0,0,0,0.07)`,
+                            borderRadius: "2px 16px 16px 16px",
+                            padding: "11px 16px", display: "flex", gap: 5, alignItems: "center",
+                            boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+                          }}>
+                            {[0,1,2].map((i) => (
+                              <span key={i} style={{
+                                width: 6, height: 6, borderRadius: "50%", background: "rgba(0,0,0,0.28)", display: "block",
+                                animation: `arcignDot 1.3s ease-in-out ${i * 0.2}s infinite`,
+                              }} />
                             ))}
                           </div>
                         </motion.div>
@@ -1048,74 +807,50 @@ export const ChatWidget = () => {
                   </div>
                 </div>
 
-                {/* ── Quick Chips bar ── */}
-                <div
-                  style={{
-                    background: "#f0f0f0",
-                    borderTop: "1px solid #e0e0e0",
-                    padding: "8px 12px 6px",
-                    flexShrink: 0,
-                  }}
-                >
+                {/* Quick chips */}
+                <div style={{
+                  background: G.footerBg, backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
+                  borderTop: `1px solid ${G.border}`, padding: "8px 12px 6px", flexShrink: 0,
+                }}>
                   <div className="arcign-chips" style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 2 }}>
-                    {["Start a project", "Explore services", "Budget guidance", "Book consultation"].map((chip) => (
-                      <button
-                        key={chip}
-                        type="button"
-                        onClick={() => void sendMessage(chip)}
+                    {["Start a project","Explore services","Budget guidance","Book consultation"].map((chip) => (
+                      <button key={chip} type="button" onClick={() => void sendMessage(chip)}
+                        className="ag-chip"
                         style={{
                           flexShrink: 0, whiteSpace: "nowrap",
-                          background: "#fff", border: "1px solid #d1d5db",
+                          background: "rgba(255,255,255,0.50)",
+                          backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
+                          border: `1px solid rgba(0,0,0,0.09)`,
                           borderRadius: 16, padding: "6px 14px",
-                          fontSize: 11.5, color: "#333", cursor: "pointer",
+                          fontSize: 11.5, color: "#0a0a0a", cursor: "pointer",
                           transition: "all 0.15s", fontWeight: 500,
                           boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
-                        }}
-                      >
+                        }}>
                         {chip}
                       </button>
                     ))}
                   </div>
                 </div>
 
-                {/* ── WhatsApp-style Input ── */}
-                <div
-                  style={{
-                    background: "#f0f0f0",
-                    padding: "8px 10px 12px",
-                    flexShrink: 0,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                  }}
-                >
-                  <div
-                    className="arcign-input-bar"
-                    style={{
-                      flex: 1,
-                      display: "flex",
-                      alignItems: "center",
-                      padding: "6px 16px",
-                      background: "#fff",
-                      boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
-                    }}
-                  >
+                {/* Input */}
+                <div style={{
+                  background: G.footerBg, backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
+                  padding: "8px 10px 12px", flexShrink: 0, display: "flex", alignItems: "center", gap: 10,
+                }}>
+                  <div style={{
+                    flex: 1, display: "flex", alignItems: "center", padding: "6px 16px",
+                    background: G.inputBg, backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
+                    borderRadius: 24, border: `1px solid rgba(0,0,0,0.09)`,
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+                  }}>
                     <input
                       ref={inputRef}
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          void sendMessage(input);
-                        }
-                      }}
-                      placeholder="Message"
+                      onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void sendMessage(input); } }}
+                      placeholder="Message Suyash…"
                       autoComplete="off"
-                      style={{
-                        flex: 1, background: "none", border: "none", outline: "none",
-                        fontSize: 14, color: "#1a1a1a", height: 38,
-                      }}
+                      style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13.5, color: "#0a0a0a", height: 36 }}
                     />
                   </div>
 
@@ -1123,10 +858,17 @@ export const ChatWidget = () => {
                     type="button"
                     onClick={() => void sendMessage(input)}
                     disabled={!input.trim() || typing}
-                    className="arcign-send-btn"
-                    aria-label="Send message"
+                    className="ag-send"
+                    style={{
+                      width: 40, height: 40, borderRadius: "50%", border: "none",
+                      background: input.trim() && !typing ? "rgba(0,0,0,0.80)" : "rgba(0,0,0,0.12)",
+                      cursor: input.trim() && !typing ? "pointer" : "not-allowed",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      flexShrink: 0, transition: "background 0.2s",
+                    }}
+                    aria-label="Send"
                   >
-                    <Send size={15} color="#fff" />
+                    <Send size={15} color={input.trim() && !typing ? "#fff" : "rgba(0,0,0,0.30)"} />
                   </button>
                 </div>
 
