@@ -686,23 +686,26 @@ export const ChatWidget = () => {
           <>
             {/* ── Launcher ── */}
             {!open && (
-              <motion.button
-                key="launcher"
-                type="button"
-                onClick={() => setOpen(true)}
-                initial={{ opacity: 0, y: 24, scale: 0.88 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 24, scale: 0.88 }}
-                transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
-                aria-label="Open chat with Suyash"
-                className="fixed bottom-6 right-6 z-[70] flex items-center gap-3 md:bottom-8 md:right-8"
-                style={{
-                  background: "linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)",
-                  borderRadius: 60,
-                  padding: "10px 20px 10px 10px",
-                  boxShadow: "0 8px 32px rgba(0,0,0,0.28), 0 2px 8px rgba(0,0,0,0.18)",
-                  border: "1px solid rgba(255,255,255,0.08)",
-                }}
+             <motion.button
+  key="launcher"
+  type="button"
+  onClick={() => setOpen(true)}
+  initial={{ opacity: 0, y: 24, scale: 0.88 }}
+  animate={{ opacity: 1, y: 0, scale: 1 }}
+  exit={{ opacity: 0, y: 24, scale: 0.88 }}
+  transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
+  aria-label="Open chat with Suyash"
+  className="fixed bottom-6 right-6 z-[70] flex items-center gap-3 md:bottom-8 md:right-8"
+  style={{
+    background: "rgba(255, 255, 255, 0.55)",
+    backdropFilter: "blur(14px)",
+    WebkitBackdropFilter: "blur(14px)",
+    borderRadius: 60,
+    padding: "10px 20px 10px 10px",
+    boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
+    border: "1px solid rgba(0,0,0,0.08)",
+  }}
+>
               >
                 {/* Avatar + online dot */}
                 <span className="relative shrink-0">
@@ -725,10 +728,10 @@ export const ChatWidget = () => {
 
                 {/* Text */}
                 <span className="hidden flex-col text-left sm:flex">
-                  <span style={{ fontSize: 10, letterSpacing: "0.22em", color: "rgba(255,255,255,0.45)", textTransform: "uppercase", lineHeight: 1, marginBottom: 3 }}>
+                  <span style={{ fontSize: 10, letterSpacing: "0.22em", color: "rgba(0,0,0,0.5)", textTransform: "uppercase", lineHeight: 1, marginBottom: 3 }}>
                     ARCIGN Support
                   </span>
-                  <span style={{ fontSize: 13.5, fontWeight: 500, color: "#fff", lineHeight: 1.2 }}>
+                  <span style={{ fontSize: 13.5, fontWeight: 500, color: "#111", lineHeight: 1.2 }}>
                     Suyash · Online
                   </span>
                 </span>
