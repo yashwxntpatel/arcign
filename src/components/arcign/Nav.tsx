@@ -13,17 +13,31 @@ const links = [
 
 export const Nav = () => {
   const { scrollY } = useScroll();
+  const [open, setOpen] = useState(false);
+
   const bg = useTransform(
     scrollY,
     [0, 120],
     ["hsla(36, 24%, 96%, 0)", "hsla(36, 24%, 96%, 0.88)"]
   );
+
   const border = useTransform(
     scrollY,
     [0, 120],
     ["hsla(30, 8%, 12%, 0)", "hsla(30, 8%, 12%, 0.08)"]
   );
-  const [open, setOpen] = useState(false);
+
+  const textColor = useTransform(
+    scrollY,
+    [0, 120],
+    ["#ffffff", "#1a1a1a"]
+  );
+
+  const logoFilter = useTransform(
+    scrollY,
+    [0, 120],
+    ["brightness(0) invert(1)", "brightness(0) invert(0)"]
+  );
 
   return (
     <motion.header
@@ -32,36 +46,44 @@ export const Nav = () => {
     >
       <div className="container-luxe flex h-18 items-center justify-between md:h-20">
         <a href="#" className="flex items-center gap-3">
-          <img
+          <motion.img
             src={logo}
             alt="ARCIGN logo"
-            className="h-6 md:h-10 w-auto -ml-1"
+            style={{ filter: logoFilter }}
+            className="h-6 w-auto -ml-1 md:h-10"
           />
         </a>
 
-        <nav className="hidden items-center gap-8 xl:gap-10 lg:flex">
+        <nav className="hidden items-center gap-8 lg:flex xl:gap-10">
           {links.map((l) => (
-            <a
+            <motion.a
               key={l.href}
               href={l.href}
+              style={{ color: textColor }}
               className="luxe-link-rev text-[12px] uppercase tracking-[0.22em]"
             >
               {l.label}
-            </a>
+            </motion.a>
           ))}
         </nav>
 
-        <a
+        <motion.a
           href="#contact"
-          className="hidden lg:inline-flex items-center gap-3 border border-foreground/80 px-5 py-3 text-[11px] uppercase tracking-[0.22em] transition-colors duration-500 hover:bg-foreground hover:text-background"
+          style={{ color: textColor, borderColor: textColor }}
+          className="hidden lg:inline-flex items-center gap-3 border px-5 py-3 text-[11px] uppercase tracking-[0.22em] transition-colors duration-500 hover:bg-foreground hover:text-background"
         >
           Book Consultation
           <span className="inline-block h-2 w-2 rounded-full bg-bronze" />
-        </a>
+        </motion.a>
 
-        <button onClick={() => setOpen(!open)} className="p-2 lg:hidden" aria-label="Menu">
+        <motion.button
+          onClick={() => setOpen(!open)}
+          style={{ color: textColor }}
+          className="p-2 lg:hidden"
+          aria-label="Menu"
+        >
           {open ? <X /> : <Menu />}
-        </button>
+        </motion.button>
       </div>
 
       <motion.div
@@ -80,6 +102,7 @@ export const Nav = () => {
               {l.label}
             </a>
           ))}
+
           <a
             href="#contact"
             onClick={() => setOpen(false)}
