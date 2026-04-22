@@ -559,7 +559,6 @@ export const ChatWidget = () => {
                 aria-label="Open chat"
                 className="fixed bottom-6 right-6 z-[70] flex items-center gap-3.5 rounded-full border border-white/10 bg-surface-deep px-4 py-2.5 shadow-[0_20px_60px_rgba(0,0,0,0.30)] backdrop-blur-xl transition-transform hover:scale-[1.02] active:scale-[0.98] md:bottom-8 md:right-8"
               >
-                {/* Avatar with online dot */}
                 <span className="relative shrink-0">
                   <span className="block h-11 w-11 overflow-hidden rounded-full ring-1 ring-white/18">
                     <img src={suyashPhoto} alt="Suyash" className="h-full w-full object-cover" />
@@ -573,10 +572,10 @@ export const ChatWidget = () => {
                 </span>
 
                 <span className="hidden flex-col text-left sm:flex">
-                  <span className="text-[10px] uppercase tracking-[0.26em] text-white/45 leading-none mb-0.5">
+                  <span className="mb-0.5 text-[10px] uppercase leading-none tracking-[0.26em] text-black/55">
                     ARCIGN Support
                   </span>
-                  <span className="text-[13px] font-medium leading-snug text-white">
+                  <span className="text-[13px] font-medium leading-snug text-black">
                     Suyash · Live
                   </span>
                 </span>
@@ -609,7 +608,7 @@ export const ChatWidget = () => {
                       </span>
                     </div>
                     <div>
-                      <p className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground leading-none mb-0.5">
+                      <p className="mb-0.5 text-[10px] uppercase leading-none tracking-[0.22em] text-muted-foreground">
                         ARCIGN
                       </p>
                       <p className="text-[13.5px] font-medium leading-snug text-foreground">
@@ -683,7 +682,6 @@ export const ChatWidget = () => {
                       </motion.div>
                     ))}
 
-                    {/* Typing indicator */}
                     <AnimatePresence>
                       {typing && (
                         <motion.div
@@ -718,7 +716,7 @@ export const ChatWidget = () => {
                         key={chip}
                         type="button"
                         onClick={() => void sendMessage(chip)}
-                        className="shrink-0 rounded-full border border-black/10 bg-surface px-3.5 py-[7px] text-[11.5px] leading-none text-foreground whitespace-nowrap transition hover:bg-black hover:text-white hover:border-black active:scale-[0.96]"
+                        className="shrink-0 whitespace-nowrap rounded-full border border-black/10 bg-surface px-3.5 py-[7px] text-[11.5px] leading-none text-foreground transition hover:border-black hover:bg-black hover:text-white active:scale-[0.96]"
                       >
                         {chip}
                       </button>
@@ -748,7 +746,7 @@ export const ChatWidget = () => {
                       onClick={() => void sendMessage(input)}
                       disabled={!input.trim() || typing}
                       aria-label="Send"
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-surface-deep text-background transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-25 active:scale-95"
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-surface-deep text-background transition hover:opacity-80 active:scale-95 disabled:cursor-not-allowed disabled:opacity-25"
                     >
                       <Send className="h-3.5 w-3.5" />
                     </button>
