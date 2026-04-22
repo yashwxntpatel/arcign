@@ -706,7 +706,7 @@ export const ChatWidget = () => {
     border: "1px solid rgba(0,0,0,0.08)",
   }}
 >
-              >
+              
                 {/* Avatar + online dot */}
                 <span className="relative shrink-0">
                   <span
